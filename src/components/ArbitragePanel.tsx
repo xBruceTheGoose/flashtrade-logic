@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
-import Badge from './ui/Badge';
+import { Badge } from './ui/badge';
 import { ArbitrageOpportunity, DEX, Token } from '@/types';
 import { availableDEXes } from '@/utils/dex';
 import { commonTokens } from '@/utils/dex';
@@ -126,13 +125,13 @@ const ArbitragePanel = () => {
   const getStatusBadge = (status: ArbitrageOpportunity['status']) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="info">Pending</Badge>;
+        return <Badge variant="secondary">Pending</Badge>;
       case 'executing':
-        return <Badge variant="warning" pulsing>Executing</Badge>;
+        return <Badge variant="outline" className="animate-pulse">Executing</Badge>;
       case 'completed':
-        return <Badge variant="success">Completed</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Completed</Badge>;
       case 'failed':
-        return <Badge variant="error">Failed</Badge>;
+        return <Badge variant="destructive">Failed</Badge>;
       default:
         return null;
     }

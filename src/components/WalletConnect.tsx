@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { useWallet } from '@/hooks/useWallet';
@@ -59,7 +58,6 @@ const WalletConnect = () => {
     setIsOpen(false);
   };
 
-  // Format address to show first 6 and last 4 characters
   const formatAddress = (address: string) => {
     if (!address) return '';
     if (address.includes('...')) return address; // Already formatted
@@ -102,12 +100,12 @@ const WalletConnect = () => {
                   {wallet.type}
                 </Badge>
                 {isCorrectNetwork ? (
-                  <Badge variant="success" className="flex items-center text-xs">
+                  <Badge variant="secondary" className="flex items-center text-xs bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
                     <CheckCircle className="h-3 w-3 mr-1" />
                     Supported Network
                   </Badge>
                 ) : (
-                  <Badge variant="error" className="flex items-center text-xs">
+                  <Badge variant="destructive" className="flex items-center text-xs">
                     <AlertCircle className="h-3 w-3 mr-1" />
                     Unsupported Network
                   </Badge>
@@ -273,7 +271,6 @@ const WalletConnect = () => {
   );
 };
 
-// Helper component for the info icon
 const InfoIcon = (props: any) => {
   return (
     <svg 

@@ -60,7 +60,8 @@ const DEXPanel = () => {
               <div>
                 <h3 className="font-medium">{dex.name}</h3>
                 <Badge 
-                  variant={dex.active ? 'success' : 'default'} 
+                  variant={dex.active ? "secondary" : "default"}
+                  className={dex.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}
                   size="sm"
                 >
                   {dex.active ? 'Active' : 'Inactive'}
