@@ -8,7 +8,7 @@ import { useWallet } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/button';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
-import { Refresh, Settings } from 'lucide-react';
+import { RefreshCw, Settings } from 'lucide-react';
 
 const DEXPanel = () => {
   const { wallet } = useWallet();
@@ -42,7 +42,7 @@ const DEXPanel = () => {
           onClick={refreshDEXes} 
           disabled={loading}
         >
-          <Refresh className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </Button>
       </div>
       
