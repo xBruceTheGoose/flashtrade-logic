@@ -1,4 +1,3 @@
-
 import { WalletInfo, WalletType } from '@/types';
 
 const WALLET_STORAGE_KEY = 'flashtrade_wallet';
@@ -22,11 +21,10 @@ export const getNetworkName = (chainId: number): string => {
 };
 
 // Mapping of supported networks for each wallet type
-const supportedNetworks: Record<WalletType, number[]> = {
+const supportedNetworks: Record<Exclude<WalletType, null>, number[]> = {
   metamask: [1, 3, 4, 5, 42, 56, 137, 42161, 10],
   coinbase: [1, 3, 4, 5, 42, 137, 42161, 10],
-  walletconnect: [1, 56, 137, 42161, 10],
-  null: []
+  walletconnect: [1, 56, 137, 42161, 10]
 };
 
 // Placeholder function to simulate wallet connection
@@ -138,6 +136,7 @@ export const refreshWalletInfo = async (currentInfo: WalletInfo): Promise<Wallet
 };
 
 export const isSupportedNetwork = (type: WalletType, chainId: number): boolean => {
+  if (type === null) return false;
   return supportedNetworks[type]?.includes(chainId) || false;
 };
 
