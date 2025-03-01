@@ -1,7 +1,6 @@
-
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
-import Badge from './ui/Badge';
+import { Badge } from './ui/badge';
 import { Transaction } from '@/types';
 import { getTransactionHistory } from '@/utils/transactions';
 import { useWallet } from '@/hooks/useWallet';
@@ -37,11 +36,11 @@ const TransactionMonitor = () => {
   const getStatusBadge = (status: Transaction['status']) => {
     switch (status) {
       case 'pending':
-        return <Badge variant="warning" pulsing>Pending</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100 animate-pulse">Pending</Badge>;
       case 'confirmed':
-        return <Badge variant="success">Confirmed</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Confirmed</Badge>;
       case 'failed':
-        return <Badge variant="error">Failed</Badge>;
+        return <Badge variant="destructive">Failed</Badge>;
       default:
         return null;
     }
@@ -50,13 +49,13 @@ const TransactionMonitor = () => {
   const getTypeBadge = (type: Transaction['type']) => {
     switch (type) {
       case 'swap':
-        return <Badge variant="info">Swap</Badge>;
+        return <Badge variant="secondary" className="bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-100">Swap</Badge>;
       case 'approval':
         return <Badge variant="default">Approval</Badge>;
       case 'flashloan':
-        return <Badge variant="warning">Flash Loan</Badge>;
+        return <Badge variant="secondary" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-100">Flash Loan</Badge>;
       case 'arbitrage':
-        return <Badge variant="success">Arbitrage</Badge>;
+        return <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">Arbitrage</Badge>;
       default:
         return null;
     }

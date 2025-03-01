@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
 import { Badge } from './ui/badge';
@@ -61,8 +60,7 @@ const DEXPanel = () => {
                 <h3 className="font-medium">{dex.name}</h3>
                 <Badge 
                   variant={dex.active ? "secondary" : "default"}
-                  className={dex.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}
-                  size="sm"
+                  className={dex.active ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100 text-xs px-2 py-0.5" : "text-xs px-2 py-0.5"}
                 >
                   {dex.active ? 'Active' : 'Inactive'}
                 </Badge>
