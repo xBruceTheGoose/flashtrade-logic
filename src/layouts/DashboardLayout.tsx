@@ -1,11 +1,28 @@
 
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from '@/components/Header';
 import { WalletProvider } from '@/hooks/useWallet';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Toaster } from '@/components/ui/toaster';
 
 const DashboardLayout = () => {
+  // Add global event listeners for wallet status changes
+  useEffect(() => {
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'flashtrade_wallet') {
+        console.log('Wallet storage changed in another tab');
+        // If needed, we could sync wallet state across tabs here
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    
+    return () => {
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, []);
+
   return (
     <WalletProvider>
       <div className="min-h-screen flex flex-col">
