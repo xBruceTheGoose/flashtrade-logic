@@ -1,6 +1,7 @@
+
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
-import { Badge } from './ui/badge';
+import { Badge } from '@/components/ui/badge';
 import { DEX } from '@/types';
 import { availableDEXes } from '@/utils/dex';
 import { useWallet } from '@/hooks/useWallet';
