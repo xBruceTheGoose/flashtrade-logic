@@ -1,11 +1,12 @@
 
 import { DEX, Token } from '@/types';
+import { dexManager } from './dex/DEXManager';
 
 // Mock DEX data
 export const availableDEXes: DEX[] = [
   {
-    id: 'uniswap',
-    name: 'Uniswap',
+    id: 'uniswap_v2',
+    name: 'Uniswap V2',
     icon: 'uniswap.svg',
     active: true
   },
@@ -61,23 +62,40 @@ export const commonTokens: Token[] = [
   }
 ];
 
-// Mock function to get the price of a token on a specific DEX
+// Get the price of a token on a specific DEX
 export const getTokenPrice = async (
   dexId: string, 
   tokenAddress: string
 ): Promise<number> => {
-  // Simulate API call to get the token price from a specific DEX
-  await new Promise(resolve => setTimeout(resolve, 800));
-  
-  // For simulation purposes, add a small random variation to the base price
-  const token = commonTokens.find(t => t.address === tokenAddress);
-  if (!token || !token.price) return 0;
-  
-  const variation = (Math.random() * 0.05) - 0.025; // ±2.5% variation
-  return token.price * (1 + variation);
+  try {
+    // Update the active adapters in the DEX manager
+    dexManager.updateActiveAdapters();
+    
+    // Find the token in commonTokens
+    const token = commonTokens.find(t => t.address === tokenAddress);
+    if (!token || !token.price) return 0;
+    
+    // Get USDC token to use as a reference
+    const usdcToken = commonTokens.find(t => t.symbol === 'USDC');
+    if (!usdcToken) return 0;
+    
+    // Try to get the price from the DEX manager
+    try {
+      return await dexManager.getTokenPrice(dexId, usdcToken, token);
+    } catch (error) {
+      console.warn(`Error getting price from DEX manager, using mock price:`, error);
+      
+      // Fall back to mock price with random variation
+      const variation = (Math.random() * 0.05) - 0.025; // ±2.5% variation
+      return token.price * (1 + variation);
+    }
+  } catch (error) {
+    console.error(`Error in getTokenPrice:`, error);
+    return 0;
+  }
 };
 
-// Mock function to check for arbitrage opportunities
+// Find arbitrage opportunities
 export const findArbitrageOpportunities = async (
   sourceDexId: string,
   targetDexId: string,
@@ -101,3 +119,7 @@ export const findArbitrageOpportunities = async (
     targetPrice
   };
 };
+
+// Export additional DEX API functions
+export { dexManager } from './dex/DEXManager';
+export { SwapOptions } from './dex/interfaces';
