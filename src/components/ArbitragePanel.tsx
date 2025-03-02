@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@radix-ui/react-toast';
 import { ArbitrageOpportunity, DEX, Token } from '@/types';
 import { availableDEXes } from '@/utils/dex';
 import { commonTokens } from '@/utils/dex';

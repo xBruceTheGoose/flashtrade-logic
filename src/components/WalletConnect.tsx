@@ -22,7 +22,7 @@ import {
   CheckCircle,
   Network
 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@radix-ui/react-toast';
 import { Switch } from '@/components/ui/switch';
 import {
   Tooltip,

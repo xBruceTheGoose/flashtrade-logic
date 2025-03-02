@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import GlassCard from './ui/GlassCard';
-import { Badge } from '@/components/ui/badge';
+import { Badge } from '@radix-ui/react-toast';
 import { Transaction } from '@/types';
 import { getTransactionHistory } from '@/utils/transactions';
 import { useWallet } from '@/hooks/useWallet';
