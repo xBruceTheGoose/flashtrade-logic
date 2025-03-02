@@ -66,7 +66,7 @@ export class ArbitrageExecutorService {
       const contract = await this.initContract();
       
       // Use provided address or get from connected wallet
-      const userAddress = address || await blockchain.getWalletAddress();
+      const userAddress = address || (blockchain.getSigner() ? await blockchain.getSigner()!.getAddress() : null);
       if (!userAddress) return false;
       
       return await contract.authorizedUsers(userAddress);
