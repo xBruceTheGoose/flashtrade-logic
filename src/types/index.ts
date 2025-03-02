@@ -35,6 +35,7 @@ export type ArbitrageOpportunity = {
   profitPercentage: number;
   estimatedProfit: string;
   gasEstimate: string;
+  tradeSize?: string;
   timestamp: number;
   status: 'pending' | 'executing' | 'completed' | 'failed';
 };
