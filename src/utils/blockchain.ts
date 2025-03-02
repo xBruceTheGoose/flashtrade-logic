@@ -1,4 +1,3 @@
-
 import { ethers, BigNumber } from 'ethers';
 import { WalletType } from '@/types';
 import { getNetworkName } from '@/utils/wallet';
@@ -87,6 +86,7 @@ export const DEFAULT_RETRY_CONFIG: RetryConfig = {
 export interface EnhancedTransactionReceipt extends ethers.providers.TransactionReceipt {
   explorerUrl: string;
   networkName: string;
+  value?: string; // Add optional value property
 }
 
 // Blockchain service class
@@ -329,7 +329,11 @@ class BlockchainService {
     const gasPrice = await this.getOptimalGasPrice(gasPriceStrategy);
     
     // Prepare the transaction options
-    const txOptions = {
+    const txOptions: {
+      gasPrice: BigNumber;
+      value: BigNumber;
+      gasLimit?: BigNumber;
+    } = {
       gasPrice,
       value: valueInWei,
     };
