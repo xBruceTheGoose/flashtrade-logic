@@ -1,4 +1,7 @@
+
 import { WalletInfo, WalletType } from '@/types';
+import { blockchain } from './blockchain';
+import { toast } from '@/hooks/use-toast';
 
 const WALLET_STORAGE_KEY = 'flashtrade_wallet';
 
@@ -27,12 +30,12 @@ const supportedNetworks: Record<Exclude<WalletType, null>, number[]> = {
   walletconnect: [1, 56, 137, 42161, 10]
 };
 
-// Placeholder function to simulate wallet connection
+// Connect wallet using the blockchain service
 export const connectWallet = async (walletType: WalletType): Promise<WalletInfo> => {
   try {
     console.log(`Connecting to ${walletType} wallet...`);
     
-    // In a real implementation, this would use the appropriate wallet SDK
+    // In a real implementation, this would use the blockchain service
     // For now, we'll simulate a successful connection with dummy data
     
     // Simulate connection delay
@@ -44,8 +47,14 @@ export const connectWallet = async (walletType: WalletType): Promise<WalletInfo>
     const randomSuffix = Math.floor(Math.random() * 10000).toString().padStart(4, '0');
     const address = `${addressPrefix}...${randomSuffix}`;
     
-    const balance = (Math.random() * 10).toFixed(4) + ' ETH';
     const chainId = walletType === 'metamask' ? 1 : walletType === 'coinbase' ? 137 : 56;
+    
+    // Initialize blockchain service with the wallet type
+    await blockchain.setWalletType(walletType, chainId);
+    
+    // In a real app, we would get the balance from the blockchain
+    // For simulation, we'll use a random value
+    const balance = (Math.random() * 10).toFixed(4) + ' ETH';
     
     const walletInfo: WalletInfo = {
       address,
@@ -58,9 +67,21 @@ export const connectWallet = async (walletType: WalletType): Promise<WalletInfo>
     // Save to localStorage
     saveWalletToStorage(walletInfo);
     
+    toast({
+      title: "Wallet Connected",
+      description: `Successfully connected to ${walletType} wallet`,
+    });
+    
     return walletInfo;
   } catch (error) {
     console.error('Error connecting wallet:', error);
+    
+    toast({
+      title: "Connection Failed",
+      description: "Failed to connect wallet. Please try again.",
+      variant: "destructive",
+    });
+    
     throw new Error('Failed to connect wallet');
   }
 };
@@ -73,6 +94,11 @@ export const disconnectWallet = async (): Promise<void> => {
     
     // Clear from localStorage
     localStorage.removeItem(WALLET_STORAGE_KEY);
+    
+    toast({
+      title: "Wallet Disconnected",
+      description: "Your wallet has been disconnected",
+    });
   } catch (error) {
     console.error('Error disconnecting wallet:', error);
     throw new Error('Failed to disconnect wallet');
@@ -80,11 +106,20 @@ export const disconnectWallet = async (): Promise<void> => {
 };
 
 export const getWalletBalance = async (address: string): Promise<string> => {
-  // Simulate API call to get balance
-  await new Promise(resolve => setTimeout(resolve, 1000));
-  
-  // Return a random balance for simulation
-  return (Math.random() * 10).toFixed(4) + ' ETH';
+  try {
+    // In a real app, this would use the blockchain service
+    // For now, we'll simulate an API call
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    
+    // Return a random balance for simulation
+    return (Math.random() * 10).toFixed(4) + ' ETH';
+    
+    // In a real implementation with blockchain service:
+    // return await blockchain.getBalance(address);
+  } catch (error) {
+    console.error('Error getting wallet balance:', error);
+    return '0 ETH';
+  }
 };
 
 export const isWalletConnected = (): boolean => {
@@ -101,13 +136,28 @@ export const switchNetwork = async (chainId: number): Promise<void> => {
     // Update localStorage with new chainId
     const walletInfo = getWalletFromStorage();
     if (walletInfo) {
+      // Update the blockchain service
+      await blockchain.setWalletType(walletInfo.type, chainId);
+      
       saveWalletToStorage({
         ...walletInfo,
         chainId
       });
+      
+      toast({
+        title: "Network Changed",
+        description: `Switched to ${getNetworkName(chainId)}`,
+      });
     }
   } catch (error) {
     console.error('Error switching network:', error);
+    
+    toast({
+      title: "Network Switch Failed",
+      description: `Failed to switch to network ${chainId}`,
+      variant: "destructive",
+    });
+    
     throw new Error(`Failed to switch to network ${chainId}`);
   }
 };
