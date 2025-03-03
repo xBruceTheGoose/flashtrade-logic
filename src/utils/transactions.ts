@@ -1,7 +1,13 @@
-
 import { Transaction } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { blockchain, GasPriceStrategy, approveToken as approveTokenBlockchain, sendTransaction as sendTransactionBlockchain, executeContractTransaction as executeContractTransactionBlockchain, waitForTransaction } from './blockchain';
+import { blockchain } from './blockchain';
+import { 
+  GasPriceStrategy, 
+  approveToken as approveTokenBlockchain, 
+  sendTransaction as sendTransactionBlockchain, 
+  executeContractTransaction as executeContractTransactionBlockchain, 
+  waitForTransaction 
+} from './blockchain';
 import { toast } from '@/hooks/use-toast';
 
 // Mock transaction history (keep for demo purposes)
@@ -127,8 +133,6 @@ export const updateTransactionStatus = (
   return null;
 };
 
-// New functions that utilize the blockchain service
-
 // Create and send a transaction
 export const sendTransaction = async (
   to: string,
@@ -156,7 +160,7 @@ export const sendTransaction = async (
     const transaction = addTransaction(pendingTx);
     
     // Send the transaction using the blockchain service
-    const receipt = await blockchain.sendTransaction(to, value, data, gasPriceStrategy);
+    const receipt = await sendTransactionBlockchain(to, value, data, gasPriceStrategy);
     
     // Update the transaction with the actual hash and status
     updateTransactionStatus(
@@ -215,7 +219,7 @@ export const executeContractMethod = async (
     const transaction = addTransaction(pendingTx);
     
     // Execute the contract method using the blockchain service
-    const receipt = await blockchain.executeContractTransaction(
+    const receipt = await executeContractTransactionBlockchain(
       contractAddress,
       abi,
       methodName,
@@ -279,7 +283,7 @@ export const approveToken = async (
     const transaction = addTransaction(pendingTx);
     
     // Approve the token using the blockchain service
-    const receipt = await blockchain.approveToken(
+    const receipt = await approveTokenBlockchain(
       tokenAddress,
       spenderAddress,
       amount,
@@ -335,7 +339,7 @@ export const trackTransaction = async (
     const transaction = addTransaction(pendingTx);
     
     // Wait for the transaction to be mined
-    const receipt = await blockchain.waitForTransaction(txHash);
+    const receipt = await waitForTransaction(txHash);
     
     // Update the transaction with the details from the receipt
     updateTransactionStatus(
