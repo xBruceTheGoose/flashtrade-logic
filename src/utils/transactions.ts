@@ -1,6 +1,7 @@
+
 import { Transaction } from '@/types';
 import { v4 as uuidv4 } from 'uuid';
-import { blockchain, GasPriceStrategy } from './blockchain';
+import { blockchain, GasPriceStrategy, approveToken as approveTokenBlockchain, sendTransaction as sendTransactionBlockchain, executeContractTransaction as executeContractTransactionBlockchain, waitForTransaction } from './blockchain';
 import { toast } from '@/hooks/use-toast';
 
 // Mock transaction history (keep for demo purposes)

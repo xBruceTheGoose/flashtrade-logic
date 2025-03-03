@@ -1,8 +1,9 @@
+
 import { ArbitrageOpportunity, DEX, Token } from '@/types';
 import { findArbitrageOpportunities } from './dex';
 import { v4 as uuidv4 } from 'uuid';
 import { flashloanService, FlashloanOptions } from './flashloan';
-import { blockchain } from './blockchain';
+import { blockchain, GasPriceStrategy } from './blockchain';
 import { toast } from '@/hooks/use-toast';
 import { arbitrageExecutorService } from './contracts/arbitrageExecutor';
 
