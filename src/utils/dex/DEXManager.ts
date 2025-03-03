@@ -6,6 +6,9 @@ import { UniswapV2Adapter } from './UniswapV2Adapter';
 import { SushiSwapAdapter } from './SushiSwapAdapter';
 import { blockchain } from '@/utils/blockchain';
 import { availableDEXes } from '@/utils/dex';
+import { getWETHAddress } from './utils/common';
+import { getBestPrice, findBestTradeRoute } from './utils/trades';
+import { executeSwap, executeBestSwap } from './utils/swaps';
 
 /**
  * Manager class for interacting with multiple DEXes
@@ -35,13 +38,11 @@ export class DEXManager {
       };
 
       // Initialize adapters for each DEX
-      // Here we're creating all adapters but in a real app, you might want to lazy-load them
-      
       // Uniswap V2
       const uniswapV2Adapter = new UniswapV2Adapter({
         ...config,
         additionalConfig: {
-          wethAddress: this.getWETHAddress()
+          wethAddress: getWETHAddress(this.chainId)
         }
       });
       this.adapters.set(uniswapV2Adapter.getDexId(), uniswapV2Adapter);
@@ -50,12 +51,10 @@ export class DEXManager {
       const sushiswapAdapter = new SushiSwapAdapter({
         ...config,
         additionalConfig: {
-          wethAddress: this.getWETHAddress()
+          wethAddress: getWETHAddress(this.chainId)
         }
       });
       this.adapters.set(sushiswapAdapter.getDexId(), sushiswapAdapter);
-      
-      // TODO: Add more DEX adapters here
       
       // Set which DEXes are active by default
       this.updateActiveAdapters();
@@ -110,30 +109,7 @@ export class DEXManager {
     dexId: string;
     dexName: string;
   }> {
-    const activeAdapters = this.getActiveAdapters();
-    
-    if (activeAdapters.length === 0) {
-      return { price: 0, dexId: '', dexName: '' };
-    }
-    
-    const pricePromises = activeAdapters.map(async adapter => {
-      try {
-        const price = await adapter.getTokenPrice(tokenA, tokenB);
-        return { price, dexId: adapter.getDexId(), dexName: adapter.getDexName() };
-      } catch (error) {
-        console.error(`Error getting price from ${adapter.getDexName()}:`, error);
-        return { price: 0, dexId: adapter.getDexId(), dexName: adapter.getDexName() };
-      }
-    });
-    
-    const prices = await Promise.all(pricePromises);
-    
-    // Find the best price (highest output)
-    const bestPrice = prices.reduce((best, current) => {
-      return current.price > best.price ? current : best;
-    }, { price: 0, dexId: '', dexName: '' });
-    
-    return bestPrice;
+    return getBestPrice(this.getActiveAdapters(), tokenA, tokenB);
   }
 
   /**
@@ -144,37 +120,7 @@ export class DEXManager {
     tokenOut: Token,
     amountIn: string
   ): Promise<TradeRoute | null> {
-    const activeAdapters = this.getActiveAdapters();
-    
-    if (activeAdapters.length === 0) {
-      return null;
-    }
-    
-    const tradePromises = activeAdapters.map(async adapter => {
-      try {
-        const result = await adapter.getExpectedOutput(tokenIn, tokenOut, amountIn);
-        return {
-          dexId: adapter.getDexId(),
-          path: [tokenIn, tokenOut],
-          amountOut: result.amountOut,
-          priceImpact: result.priceImpact
-        };
-      } catch (error) {
-        console.error(`Error calculating trade on ${adapter.getDexName()}:`, error);
-        return null;
-      }
-    });
-    
-    const trades = (await Promise.all(tradePromises)).filter((trade): trade is TradeRoute => trade !== null);
-    
-    if (trades.length === 0) {
-      return null;
-    }
-    
-    // Find the best trade (highest output)
-    return trades.reduce((best, current) => {
-      return parseFloat(current.amountOut) > parseFloat(best.amountOut) ? current : best;
-    });
+    return findBestTradeRoute(this.getActiveAdapters(), tokenIn, tokenOut, amountIn);
   }
 
   /**
@@ -201,24 +147,7 @@ export class DEXManager {
       };
     }
     
-    // Get expected output
-    const { amountOut } = await adapter.getExpectedOutput(tokenIn, tokenOut, amountIn);
-    
-    // Calculate minimum output with slippage
-    const minAmountOut = this.applySlippage(amountOut, options.slippageTolerance, tokenOut.decimals);
-    
-    // Get recipient address
-    const recipient = options.recipient || (await this.getSigner().getAddress());
-    
-    // Execute swap
-    return adapter.executeSwap(
-      tokenIn,
-      tokenOut,
-      amountIn,
-      minAmountOut,
-      recipient,
-      options.deadline
-    );
+    return executeSwap(adapter, tokenIn, tokenOut, amountIn, options);
   }
 
   /**
@@ -236,29 +165,14 @@ export class DEXManager {
     amountOut?: string;
     error?: string;
   }> {
-    // Find best trade route
-    const bestRoute = await this.findBestTradeRoute(tokenIn, tokenOut, amountIn);
-    
-    if (!bestRoute) {
-      return {
-        success: false,
-        error: 'No valid trade route found'
-      };
-    }
-    
-    // Execute swap on the best DEX
-    const result = await this.executeSwap(
-      bestRoute.dexId,
+    return executeBestSwap(
+      () => this.findBestTradeRoute(tokenIn, tokenOut, amountIn),
+      (dexId) => this.getAdapter(dexId),
       tokenIn,
       tokenOut,
       amountIn,
       options
     );
-    
-    return {
-      ...result,
-      dexId: bestRoute.dexId
-    };
   }
 
   /**
@@ -289,50 +203,6 @@ export class DEXManager {
     }
     
     return adapter.getLiquidity(tokenA, tokenB);
-  }
-
-  /**
-   * Apply slippage tolerance to an amount
-   */
-  private applySlippage(
-    amount: string,
-    slippageBps: number,
-    decimals: number
-  ): string {
-    const amountBN = ethers.utils.parseUnits(amount, decimals);
-    const slippageFactor = 10000 - slippageBps; // e.g., 9950 for 0.5% slippage
-    const minAmountBN = amountBN.mul(slippageFactor).div(10000);
-    return ethers.utils.formatUnits(minAmountBN, decimals);
-  }
-
-  /**
-   * Get the signer for transactions
-   */
-  private getSigner(): ethers.Signer {
-    const signer = blockchain.getSigner();
-    if (!signer) {
-      throw new Error('No signer available');
-    }
-    return signer;
-  }
-
-  /**
-   * Get WETH address for the current chain
-   */
-  private getWETHAddress(): string {
-    // WETH addresses for different chains
-    const wethAddresses: Record<number, string> = {
-      1: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2', // Ethereum Mainnet
-      3: '0xc778417E063141139Fce010982780140Aa0cD5Ab', // Ropsten
-      4: '0xc778417E063141139Fce010982780140Aa0cD5Ab', // Rinkeby
-      5: '0xB4FBF271143F4FBf7B91A5ded31805e42b2208d6', // Görli
-      42: '0xd0A1E359811322d97991E03f863a0C30C2cF029C', // Kovan
-      56: '0xbb4CdB9CBd36B01bD1cBaEBF2De08d9173bc095c', // BSC (WBNB)
-      137: '0x0d500B1d8E8eF31E21C99d1Db9A6444d3ADf1270', // Polygon (WMATIC)
-      42161: '0x82aF49447D8a07e3bd95BD0d56f35241523fBab1', // Arbitrum
-    };
-    
-    return wethAddresses[this.chainId] || wethAddresses[1]; // Default to Ethereum Mainnet
   }
 }
 
