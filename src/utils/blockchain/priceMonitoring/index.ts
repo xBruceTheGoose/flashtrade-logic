@@ -5,3 +5,4 @@ export * from './storage';
 export * from './rateLimit';
 export * from './websocket';
 export * from './types';
+export * from './arbitrageDetection';

@@ -7,6 +7,7 @@ import { RateLimiter } from './rateLimit';
 import { priceHistoryStorage } from './storage';
 import { webSocketManager } from './websocket';
 import { executeArbitrage, estimateGasCost } from '@/utils/arbitrage';
+import { arbitrageDetectionEngine } from './arbitrageDetection';
 import { v4 as uuidv4 } from 'uuid';
 import { flashloanService } from '@/utils/flashloan';
 import { blockchain } from '@/utils/blockchain';
@@ -23,14 +24,25 @@ class PriceMonitoringService {
     minProfitPercentage: 0.5, // 0.5%
     autoExecuteTrades: false,
     maxPriceHistoryLength: 1000,
+    maxArbitragePathLength: 3,
+    minProfitUSD: 5,
   };
   private activeDexes: DEX[] = [];
   private pendingOpportunities: Map<string, ArbitrageOpportunity> = new Map();
   private chainId: number = 1;
+  private lastArbitrageScan: number = 0;
+  private arbitrageScanInterval: number = 60000; // 1 minute
 
   constructor() {
     this.rateLimiter = new RateLimiter(this.config.maxRequestsPerMinute);
     priceHistoryStorage.setMaxHistoryLength(this.config.maxPriceHistoryLength);
+    
+    // Initialize arbitrage detection engine with our configuration
+    arbitrageDetectionEngine.updateConfig({
+      minProfitPercentage: this.config.minProfitPercentage,
+      minProfitUSD: this.config.minProfitUSD,
+      maxPathLength: this.config.maxArbitragePathLength
+    });
   }
 
   /**
@@ -48,6 +60,13 @@ class PriceMonitoringService {
     if (config.maxPriceHistoryLength) {
       priceHistoryStorage.setMaxHistoryLength(this.config.maxPriceHistoryLength);
     }
+    
+    // Update arbitrage detection engine configuration
+    arbitrageDetectionEngine.updateConfig({
+      minProfitPercentage: this.config.minProfitPercentage,
+      minProfitUSD: this.config.minProfitUSD,
+      maxPathLength: this.config.maxArbitragePathLength
+    });
     
     // Restart polling if running and interval changed
     if (this.isRunning && config.pollingInterval && this.pollingIntervalId) {
@@ -265,6 +284,7 @@ class PriceMonitoringService {
     }
     
     try {
+      // Poll prices from RESTful APIs
       for (const pair of this.monitoredPairs) {
         for (const dex of this.activeDexes) {
           // Check rate limits
@@ -298,106 +318,63 @@ class PriceMonitoringService {
         }
       }
       
-      // Check for arbitrage opportunities
-      this.checkForArbitrageOpportunities();
+      // Periodically check for arbitrage opportunities
+      const now = Date.now();
+      if (now - this.lastArbitrageScan >= this.arbitrageScanInterval) {
+        this.lastArbitrageScan = now;
+        this.scanForArbitrageOpportunities();
+      }
     } catch (error) {
       console.error('Error polling prices:', error);
     }
   }
 
   /**
-   * Check for arbitrage opportunities across DEXes
+   * Scan for arbitrage opportunities across DEXes
    */
-  private async checkForArbitrageOpportunities(): Promise<void> {
+  private async scanForArbitrageOpportunities(): Promise<void> {
     if (!this.isRunning || this.activeDexes.length < 2) {
       return;
     }
     
     try {
+      // Extract unique tokens from all monitored pairs
+      const uniqueTokens = new Map<string, Token>();
+      
       for (const pair of this.monitoredPairs) {
-        const { tokenA, tokenB } = pair;
-        
-        // For each pair of DEXes
-        for (let i = 0; i < this.activeDexes.length; i++) {
-          for (let j = i + 1; j < this.activeDexes.length; j++) {
-            const dexA = this.activeDexes[i];
-            const dexB = this.activeDexes[j];
-            
-            // Get latest prices
-            const priceA = priceHistoryStorage.getLatestPrice(tokenA.address, dexA.id);
-            const priceB = priceHistoryStorage.getLatestPrice(tokenA.address, dexB.id);
-            
-            if (priceA === null || priceB === null) {
-              continue;
-            }
-            
-            // Calculate price difference
-            const priceDiff = ((priceB - priceA) / priceA) * 100;
-            const absPriceDiff = Math.abs(priceDiff);
-            
-            // Check if price difference is significant
-            if (absPriceDiff < this.config.minProfitPercentage) {
-              continue;
-            }
-            
-            // Determine source and target DEX based on price difference
-            const [sourceDex, targetDex] = priceDiff > 0 ? [dexA, dexB] : [dexB, dexA];
-            
-            // Calculate a reasonable trade size based on available liquidity
-            // This is a simplified approach; in practice, you'd want to optimize this
-            const tradeSize = `${tokenA.price ? (1000 / tokenA.price).toFixed(4) : "1.0"}`;
-            
-            // Estimate gas cost
-            const gasEstimate = await estimateGasCost();
-            
-            // Calculate estimated profit
-            const profitPercentage = Math.abs(priceDiff);
-            const estimatedProfit = `${((tokenA.price || 1) * (profitPercentage / 100)).toFixed(4)} USD`;
-            
-            // Check if profit would cover fees
-            const profitabilityCheck = await flashloanService.calculateArbitrageProfitability(
-              tokenA,
-              tradeSize,
-              estimatedProfit
-            );
-            
-            if (!profitabilityCheck.isProfitable) {
-              continue;
-            }
-            
-            // Create arbitrage opportunity
-            const opportunity: ArbitrageOpportunity = {
-              id: uuidv4(),
-              sourceDex,
-              targetDex,
-              tokenIn: tokenA,
-              tokenOut: tokenB,
-              profitPercentage: profitPercentage,
-              estimatedProfit: profitabilityCheck.netProfit,
-              gasEstimate,
-              tradeSize,
-              timestamp: Date.now(),
-              status: 'pending'
-            };
-            
-            // Save opportunity for potential execution
-            this.pendingOpportunities.set(opportunity.id, opportunity);
-            
-            // If auto-execute is enabled, execute the trade
-            if (this.config.autoExecuteTrades) {
-              this.executeOpportunity(opportunity);
-            } else {
-              // Notify user of opportunity
-              toast({
-                title: "Arbitrage Opportunity",
-                description: `${tokenA.symbol}: ${profitPercentage.toFixed(2)}% profit between ${sourceDex.name} and ${targetDex.name}`,
-              });
-            }
+        uniqueTokens.set(pair.tokenA.address, pair.tokenA);
+        uniqueTokens.set(pair.tokenB.address, pair.tokenB);
+      }
+      
+      const tokens = Array.from(uniqueTokens.values());
+      
+      // Use arbitrage detection engine to scan for opportunities
+      const opportunities = await arbitrageDetectionEngine.scanForOpportunities(
+        tokens,
+        this.activeDexes
+      );
+      
+      // Process new opportunities
+      for (const opportunity of opportunities) {
+        // Check if opportunity already exists
+        if (!this.pendingOpportunities.has(opportunity.id)) {
+          // Add to pending opportunities
+          this.pendingOpportunities.set(opportunity.id, opportunity);
+          
+          // If auto-execute is enabled, execute the trade
+          if (this.config.autoExecuteTrades) {
+            this.executeOpportunity(opportunity);
+          } else {
+            // Notify user of opportunity
+            toast({
+              title: "Arbitrage Opportunity",
+              description: `${opportunity.tokenIn.symbol}: ${opportunity.profitPercentage.toFixed(2)}% profit between ${opportunity.sourceDex.name} and ${opportunity.targetDex.name}`,
+            });
           }
         }
       }
     } catch (error) {
-      console.error('Error checking for arbitrage opportunities:', error);
+      console.error('Error scanning for arbitrage opportunities:', error);
     }
   }
 
@@ -449,10 +426,32 @@ class PriceMonitoringService {
   }
 
   /**
+   * Force scan for arbitrage opportunities now
+   * (useful for UI interactions)
+   */
+  async forceScanForArbitrageOpportunities(): Promise<ArbitrageOpportunity[]> {
+    // Reset the last scan time to ensure we scan
+    this.lastArbitrageScan = Date.now();
+    
+    // Scan for opportunities
+    await this.scanForArbitrageOpportunities();
+    
+    // Return pending opportunities
+    return this.getPendingOpportunities();
+  }
+
+  /**
    * Get all pending opportunities
    */
   getPendingOpportunities(): ArbitrageOpportunity[] {
     return Array.from(this.pendingOpportunities.values());
+  }
+
+  /**
+   * Get an opportunity by ID
+   */
+  getOpportunity(id: string): ArbitrageOpportunity | undefined {
+    return this.pendingOpportunities.get(id);
   }
 
   /**
@@ -478,6 +477,7 @@ class PriceMonitoringService {
     activeDexesCount: number;
     pendingOpportunitiesCount: number;
     requestsRemaining: number;
+    lastArbitrageScan: number;
   } {
     return {
       isRunning: this.isRunning,
@@ -485,6 +485,7 @@ class PriceMonitoringService {
       activeDexesCount: this.activeDexes.length,
       pendingOpportunitiesCount: this.pendingOpportunities.size,
       requestsRemaining: this.rateLimiter.getRequestsRemaining(),
+      lastArbitrageScan: this.lastArbitrageScan,
     };
   }
 }

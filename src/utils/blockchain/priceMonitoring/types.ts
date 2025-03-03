@@ -23,6 +23,10 @@ export interface MonitoringConfig {
   autoExecuteTrades: boolean;
   // Maximum number of price points to store per token
   maxPriceHistoryLength: number;
+  // Maximum number of hops for multi-path arbitrage
+  maxArbitragePathLength: number;
+  // Minimum profit in USD to consider
+  minProfitUSD: number;
 }
 
 export interface TokenPair {
