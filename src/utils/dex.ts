@@ -122,4 +122,5 @@ export const findArbitrageOpportunities = async (
 
 // Export additional DEX API functions
 export { dexManager } from './dex/DEXManager';
-export { SwapOptions } from './dex/interfaces';
+export type { SwapOptions } from './dex/interfaces';
+
