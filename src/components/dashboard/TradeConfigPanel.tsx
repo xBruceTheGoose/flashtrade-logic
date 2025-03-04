@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useWallet } from '@/hooks/useWallet';
 import GlassCard from '@/components/ui/GlassCard';
@@ -25,7 +24,6 @@ const TradeConfigPanel = () => {
   const [executionStrategy, setExecutionStrategy] = useState<ExecutionStrategyType>('sequential');
   const [maxConcurrentTrades, setMaxConcurrentTrades] = useState('2');
   
-  // Load saved settings on component mount
   useEffect(() => {
     const config = tradeExecutor.getExecutionConfig();
     setMinProfitPercentage(config.minProfitPercentage.toString());
@@ -40,7 +38,6 @@ const TradeConfigPanel = () => {
 
   const handleSaveSettings = () => {
     try {
-      // Validate inputs
       const profitPercentage = parseFloat(minProfitPercentage);
       const tradeSize = parseFloat(maxTradeSize);
       const slippage = parseFloat(slippageTolerance);
@@ -62,7 +59,6 @@ const TradeConfigPanel = () => {
         throw new Error('Invalid concurrent trades value');
       }
       
-      // Update trade executor configuration
       tradeExecutor.updateExecutionConfig({
         minProfitPercentage: profitPercentage,
         maxTradeSize: tradeSize,

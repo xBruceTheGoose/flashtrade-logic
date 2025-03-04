@@ -1,3 +1,4 @@
+
 import { TradeExecutionRecord } from './types';
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
@@ -52,6 +53,13 @@ class TradeExecutionStorage {
    */
   getRecords(): TradeExecutionRecord[] {
     return [...this.records];
+  }
+  
+  /**
+   * Get trade history (alias for getRecords for backward compatibility)
+   */
+  getTradeHistory(): TradeExecutionRecord[] {
+    return this.getRecords();
   }
   
   /**

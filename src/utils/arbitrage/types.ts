@@ -2,6 +2,9 @@
 import { ArbitrageOpportunity, DEX, Token } from '@/types';
 
 export type ExecutionStrategyType = 'sequential' | 'concurrent' | 'priority';
+export type ExecutionStrategy = 'conservative' | 'balanced' | 'aggressive';
+export type ExecutionPriority = 'low' | 'medium' | 'high';
+export type ExecutionStatus = 'pending' | 'preparing' | 'estimating' | 'ready' | 'executing' | 'completed' | 'failed';
 
 export interface ExecutionConfig {
   // Minimum profit percentage required for trade execution
@@ -27,6 +30,38 @@ export interface ExecutionConfig {
   
   // Maximum number of concurrent trades (only used with concurrent strategy)
   maxConcurrentTrades: number;
+}
+
+export const DEFAULT_EXECUTION_OPTIONS: ExecutionOptions = {
+  strategy: 'balanced',
+  priority: 'medium',
+  useFlashloan: false,
+  flashloanProvider: 'aave',
+  maxGasPrice: '100',
+  gasPriceMultiplier: 1.1,
+  maxRetries: 2,
+  retryDelay: 15000, // 15 seconds
+  slippageTolerance: 0.5 // 0.5%
+};
+
+export interface ExecutionOptions {
+  strategy: ExecutionStrategy;
+  priority: ExecutionPriority;
+  useFlashloan: boolean;
+  flashloanProvider: 'aave' | 'uniswap' | 'dydx';
+  maxGasPrice: string;
+  gasPriceMultiplier: number;
+  maxRetries: number;
+  retryDelay: number;
+  slippageTolerance: number;
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  status: ExecutionStatus;
+  transactionHash?: string;
+  error?: string;
+  executionTime?: number;
 }
 
 export interface TradeExecutionResult {
@@ -57,6 +92,29 @@ export interface TradeExecutionRecord {
   profitPercentage?: string;
   executionTime?: number;
   strategyUsed?: string;
+  
+  // Additional fields needed for our application
+  status: ExecutionStatus;
+  opportunityId?: string;
+  tokenInSymbol?: string;
+  tokenOutSymbol?: string;
+  tradeSize?: string;
+  expectedProfit?: string;
+  actualProfit?: string;
+  transactionHash?: string;
+  path?: string[];
+  useFlashloan?: boolean;
+  flashloanProvider?: string;
+  strategy?: string;
+}
+
+export interface ExecutionQueueItem {
+  opportunity: ArbitrageOpportunity;
+  options: ExecutionOptions;
+  priority: number;
+  addedAt: number;
+  executionAttempts: number;
+  status: ExecutionStatus;
 }
 
 export interface ExecutionQueue {

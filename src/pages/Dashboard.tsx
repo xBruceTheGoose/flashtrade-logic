@@ -27,12 +27,12 @@ const Dashboard = () => {
 
   useEffect(() => {
     // Load trade history on component mount
-    const history = tradeExecutionStorage.getTradeHistory();
+    const history = tradeExecutionStorage.getRecords();
     setTradeHistory(history);
 
     // Set up event listener for new trades
     const handleNewTrade = () => {
-      setTradeHistory(tradeExecutionStorage.getTradeHistory());
+      setTradeHistory(tradeExecutionStorage.getRecords());
       // Show notification for new trades
       toast({
         title: "Trade Executed",
