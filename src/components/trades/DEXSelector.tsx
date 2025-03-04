@@ -1,8 +1,12 @@
 
+import { useState, useEffect } from 'react';
 import { DEX } from '@/types';
 import { availableDEXes } from '@/utils/dex';
 import { Card } from '@/components/ui/card';
 import { Switch } from '@/components/ui/switch';
+import { AlertTriangle } from 'lucide-react';
+import { MAX_CONFIGS } from '@/utils/arbitrage/constants';
+import { toast } from '@/hooks/use-toast';
 
 interface DEXSelectorProps {
   selectedDexes: string[];
@@ -11,10 +15,46 @@ interface DEXSelectorProps {
 }
 
 const DEXSelector = ({ selectedDexes, setSelectedDexes, disabled = false }: DEXSelectorProps) => {
+  const [validDexIds, setValidDexIds] = useState<Set<string>>(new Set());
+
+  // Validate available DEXes on mount
+  useEffect(() => {
+    // Create a set of valid DEX IDs for faster lookup
+    const validIds = new Set(availableDEXes.map(dex => dex.id));
+    setValidDexIds(validIds);
+    
+    // Filter out any invalid DEXes from the initial selection
+    const validSelected = selectedDexes.filter(id => validIds.has(id));
+    if (validSelected.length !== selectedDexes.length) {
+      console.warn('Invalid DEX IDs detected in selection, filtering them out');
+      setSelectedDexes(validSelected);
+    }
+  }, [availableDEXes]);
+
   const handleDexToggle = (dexId: string) => {
+    // Validate DEX ID
+    if (!validDexIds.has(dexId)) {
+      console.error(`Attempted to toggle invalid DEX ID: ${dexId}`);
+      toast({
+        title: "Security Warning",
+        description: "Invalid DEX identifier detected",
+        variant: "destructive"
+      });
+      return;
+    }
+    
     if (selectedDexes.includes(dexId)) {
       setSelectedDexes(selectedDexes.filter(id => id !== dexId));
     } else {
+      // Check if we're exceeding the maximum allowed configurations
+      if (selectedDexes.length >= MAX_CONFIGS) {
+        toast({
+          title: "Limit Reached",
+          description: `You can monitor a maximum of ${MAX_CONFIGS} DEXes at once`,
+          variant: "destructive"
+        });
+        return;
+      }
       setSelectedDexes([...selectedDexes, dexId]);
     }
   };
@@ -51,6 +91,13 @@ const DEXSelector = ({ selectedDexes, setSelectedDexes, disabled = false }: DEXS
       <div className="text-xs text-muted-foreground mt-2">
         Enable DEXes to monitor for arbitrage opportunities. More DEXes may increase the likelihood of finding opportunities but will use more resources.
       </div>
+      
+      {selectedDexes.length === 0 && (
+        <div className="text-yellow-600 text-xs flex items-center mt-2">
+          <AlertTriangle className="h-3 w-3 mr-1" />
+          <span>At least one DEX should be selected for monitoring</span>
+        </div>
+      )}
     </div>
   );
 };

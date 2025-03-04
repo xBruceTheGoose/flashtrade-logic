@@ -3,8 +3,10 @@ export class RateLimiter {
   private requestTimes: number[] = [];
   private maxRequests: number;
   private timeWindowMs: number;
+  private name: string;
 
-  constructor(maxRequests: number, timeWindowMs: number = 60000) {
+  constructor(name: string, maxRequests: number, timeWindowMs: number = 60000) {
+    this.name = name;
     this.maxRequests = maxRequests;
     this.timeWindowMs = timeWindowMs;
   }
@@ -38,6 +40,8 @@ export class RateLimiter {
       return true;
     }
     
+    console.log(`Rate limited: ${this.name} - waiting for availability`);
+    
     // Otherwise, wait until we can make a request or timeout
     return new Promise((resolve, reject) => {
       const checkInterval = setInterval(() => {
@@ -46,7 +50,7 @@ export class RateLimiter {
         // If timeout exceeded, reject
         if (now - startTime > timeoutMs) {
           clearInterval(checkInterval);
-          reject(new Error('Rate limit timeout exceeded'));
+          reject(new Error(`Rate limit timeout exceeded for ${this.name}`));
           return;
         }
         
@@ -68,4 +72,58 @@ export class RateLimiter {
     );
     return this.maxRequests - this.requestTimes.length;
   }
+  
+  /**
+   * Returns time in ms until the next request slot is available
+   */
+  getTimeUntilNextAvailable(): number {
+    if (this.canMakeRequest()) {
+      return 0;
+    }
+    
+    const now = Date.now();
+    // Sort times in ascending order
+    const sortedTimes = [...this.requestTimes].sort((a, b) => a - b);
+    // Find the oldest request that will expire
+    const oldestTime = sortedTimes[0];
+    
+    return Math.max(0, (oldestTime + this.timeWindowMs) - now);
+  }
+
+  /**
+   * Reset the rate limiter
+   */
+  reset(): void {
+    this.requestTimes = [];
+  }
 }
+
+// Create a RateLimiter registry to manage multiple rate limiters
+export class RateLimiterRegistry {
+  private limiters: Map<string, RateLimiter> = new Map();
+  
+  register(name: string, maxRequests: number, timeWindowMs: number = 60000): RateLimiter {
+    const limiter = new RateLimiter(name, maxRequests, timeWindowMs);
+    this.limiters.set(name, limiter);
+    return limiter;
+  }
+  
+  get(name: string): RateLimiter | undefined {
+    return this.limiters.get(name);
+  }
+  
+  getOrCreate(name: string, maxRequests: number, timeWindowMs: number = 60000): RateLimiter {
+    let limiter = this.limiters.get(name);
+    if (!limiter) {
+      limiter = this.register(name, maxRequests, timeWindowMs);
+    }
+    return limiter;
+  }
+  
+  resetAll(): void {
+    this.limiters.forEach(limiter => limiter.reset());
+  }
+}
+
+// Create singleton instance
+export const rateLimiters = new RateLimiterRegistry();
