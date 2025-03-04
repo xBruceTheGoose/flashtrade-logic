@@ -79,7 +79,7 @@ export interface TradeExecutionRecord {
   timestamp: number;
   tokenIn: string;
   tokenOut: string;
-  amountIn?: string;  // Made optional
+  amountIn?: string;  // Already made optional
   amountOut?: string;
   sourceDex: string;
   targetDex: string;

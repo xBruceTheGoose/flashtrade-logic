@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { tradeExecutor } from '@/utils/arbitrage/tradeExecutor';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
