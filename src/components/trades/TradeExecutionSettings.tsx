@@ -10,12 +10,12 @@ import { Slider } from '@/components/ui/slider';
 import { toast } from '@/hooks/use-toast';
 
 export function TradeExecutionSettings() {
-  const [config, setConfig] = useState(tradeExecutor.getConfig());
+  const [config, setConfig] = useState(tradeExecutor.getExecutionConfig());
   const [isEditing, setIsEditing] = useState(false);
 
   useEffect(() => {
     // Refresh config
-    setConfig(tradeExecutor.getConfig());
+    setConfig(tradeExecutor.getExecutionConfig());
   }, []);
 
   const handleToggleAutoExecute = () => {
@@ -25,7 +25,7 @@ export function TradeExecutionSettings() {
     };
     
     setConfig(newConfig);
-    tradeExecutor.updateConfig(newConfig);
+    tradeExecutor.updateExecutionConfig(newConfig);
     
     toast({
       title: config.autoExecute ? "Auto-Execution Disabled" : "Auto-Execution Enabled",
@@ -37,7 +37,7 @@ export function TradeExecutionSettings() {
 
   const handleSaveConfig = () => {
     try {
-      tradeExecutor.updateConfig(config);
+      tradeExecutor.updateExecutionConfig(config);
       setIsEditing(false);
       
       toast({
@@ -113,43 +113,17 @@ export function TradeExecutionSettings() {
                 min={1}
                 max={50}
                 step={1}
-                value={[config.minProfitForAutoExecute]}
+                value={[config.minProfitPercentage]}
                 onValueChange={(value) => setConfig({
                   ...config,
-                  minProfitForAutoExecute: value[0]
+                  minProfitPercentage: value[0]
                 })}
               />
               <Input
                 type="number"
                 disabled={!isEditing}
-                value={config.minProfitForAutoExecute}
-                onChange={(e) => handleInputChange(e, 'minProfitForAutoExecute')}
-                className="w-20"
-              />
-            </div>
-          </div>
-
-          {/* Min Confidence Score */}
-          <div className="space-y-2">
-            <Label htmlFor="min-confidence">Minimum Confidence Score</Label>
-            <div className="flex items-center gap-4">
-              <Slider
-                id="min-confidence"
-                disabled={!isEditing}
-                min={0}
-                max={100}
-                step={5}
-                value={[config.minConfidenceForAutoExecute]}
-                onValueChange={(value) => setConfig({
-                  ...config,
-                  minConfidenceForAutoExecute: value[0]
-                })}
-              />
-              <Input
-                type="number"
-                disabled={!isEditing}
-                value={config.minConfidenceForAutoExecute}
-                onChange={(e) => handleInputChange(e, 'minConfidenceForAutoExecute')}
+                value={config.minProfitPercentage}
+                onChange={(e) => handleInputChange(e, 'minProfitPercentage')}
                 className="w-20"
               />
             </div>
@@ -165,45 +139,67 @@ export function TradeExecutionSettings() {
                 min={100}
                 max={10000}
                 step={100}
-                value={[config.maxAutoExecuteTradeSize]}
+                value={[config.maxTradeSize]}
                 onValueChange={(value) => setConfig({
                   ...config,
-                  maxAutoExecuteTradeSize: value[0]
+                  maxTradeSize: value[0]
                 })}
               />
               <Input
                 type="number"
                 disabled={!isEditing}
-                value={config.maxAutoExecuteTradeSize}
-                onChange={(e) => handleInputChange(e, 'maxAutoExecuteTradeSize')}
+                value={config.maxTradeSize}
+                onChange={(e) => handleInputChange(e, 'maxTradeSize')}
                 className="w-20"
               />
             </div>
           </div>
 
-          {/* Max Gas Price */}
+          {/* Slippage Tolerance */}
           <div className="space-y-2">
-            <Label htmlFor="max-gas-price">Maximum Gas Price (Gwei)</Label>
+            <Label htmlFor="slippage">Slippage Tolerance (%)</Label>
             <div className="flex items-center gap-4">
               <Slider
-                id="max-gas-price"
+                id="slippage"
                 disabled={!isEditing}
-                min={10}
-                max={500}
-                step={10}
-                value={[config.maxGasPrice]}
+                min={0.1}
+                max={5.0}
+                step={0.1}
+                value={[config.slippageTolerance]}
                 onValueChange={(value) => setConfig({
                   ...config,
-                  maxGasPrice: value[0]
+                  slippageTolerance: value[0]
                 })}
               />
               <Input
                 type="number"
                 disabled={!isEditing}
-                value={config.maxGasPrice}
-                onChange={(e) => handleInputChange(e, 'maxGasPrice')}
+                value={config.slippageTolerance}
+                onChange={(e) => handleInputChange(e, 'slippageTolerance')}
                 className="w-20"
               />
+            </div>
+          </div>
+          
+          {/* Risk Tolerance */}
+          <div className="space-y-2">
+            <Label>Risk Tolerance</Label>
+            <div className="grid grid-cols-3 gap-2">
+              {['low', 'medium', 'high'].map((level) => (
+                <Button
+                  key={level}
+                  type="button"
+                  variant={config.riskTolerance === level ? "default" : "outline"}
+                  disabled={!isEditing}
+                  onClick={() => setConfig({
+                    ...config,
+                    riskTolerance: level as 'low' | 'medium' | 'high'
+                  })}
+                  className="w-full capitalize"
+                >
+                  {level}
+                </Button>
+              ))}
             </div>
           </div>
         </div>
@@ -213,7 +209,7 @@ export function TradeExecutionSettings() {
         {isEditing ? (
           <>
             <Button variant="outline" onClick={() => {
-              setConfig(tradeExecutor.getConfig());
+              setConfig(tradeExecutor.getExecutionConfig());
               setIsEditing(false);
             }}>
               Cancel

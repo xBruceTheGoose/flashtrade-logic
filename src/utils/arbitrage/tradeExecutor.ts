@@ -201,6 +201,41 @@ class TradeExecutor {
   }
 
   /**
+   * Auto-execute a trade if it meets criteria
+   */
+  async autoExecuteTrade(opportunity: ArbitrageOpportunity): Promise<boolean> {
+    // Check if auto-execute is enabled
+    if (!this.config.autoExecute) {
+      return false;
+    }
+    
+    // Check if the opportunity meets profit threshold
+    const profitStr = opportunity.estimatedProfit;
+    const profitValue = parseFloat(profitStr.split(' ')[0]);
+    
+    if (profitValue < this.config.minProfitPercentage) {
+      console.log('Opportunity does not meet profit threshold for auto-execution');
+      return false;
+    }
+    
+    // Check risk level
+    if (opportunity.riskLevel === 'high' && this.config.riskTolerance === 'low') {
+      console.log('High risk opportunity skipped due to low risk tolerance');
+      return false;
+    }
+    
+    // Execute the trade
+    try {
+      console.log('Auto-executing trade for opportunity:', opportunity.id);
+      const result = await this.executeTrade(opportunity);
+      return result.success;
+    } catch (error) {
+      console.error('Error auto-executing trade:', error);
+      return false;
+    }
+  }
+
+  /**
    * Get all execution records
    */
   getExecutionRecords(): TradeExecutionRecord[] {
