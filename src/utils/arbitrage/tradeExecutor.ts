@@ -1,4 +1,3 @@
-
 import { ethers } from 'ethers';
 import { ArbitrageOpportunity, DEX, Token, Transaction } from '@/types';
 import { 
@@ -119,7 +118,7 @@ class TradeExecutor {
         toast({
           title: "Already Queued",
           description: "This opportunity is already in the execution queue.",
-          variant: "warning"
+          variant: "default"
         });
         return null;
       }
