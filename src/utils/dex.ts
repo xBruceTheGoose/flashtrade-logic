@@ -7,26 +7,30 @@ export const availableDEXes: DEX[] = [
   {
     id: 'uniswap_v2',
     name: 'Uniswap V2',
-    icon: 'uniswap.svg',
-    active: true
+    logo: 'uniswap.svg',
+    active: true,
+    supportedChainIds: [1, 3, 4, 5]
   },
   {
     id: 'sushiswap',
     name: 'SushiSwap',
-    icon: 'sushiswap.svg',
-    active: true
+    logo: 'sushiswap.svg',
+    active: true,
+    supportedChainIds: [1, 3, 4, 5]
   },
   {
     id: 'curve',
     name: 'Curve',
-    icon: 'curve.svg',
-    active: true
+    logo: 'curve.svg',
+    active: true,
+    supportedChainIds: [1, 3, 4, 5]
   },
   {
     id: 'balancer',
     name: 'Balancer',
-    icon: 'balancer.svg',
-    active: false
+    logo: 'balancer.svg',
+    active: false,
+    supportedChainIds: [1, 3, 4, 5]
   }
 ];
 
@@ -37,6 +41,7 @@ export const commonTokens: Token[] = [
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
+    chainId: 1,
     price: 3500
   },
   {
@@ -44,6 +49,7 @@ export const commonTokens: Token[] = [
     symbol: 'WBTC',
     name: 'Wrapped Bitcoin',
     decimals: 8,
+    chainId: 1,
     price: 64000
   },
   {
@@ -51,6 +57,7 @@ export const commonTokens: Token[] = [
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
+    chainId: 1,
     price: 1
   },
   {
@@ -58,6 +65,7 @@ export const commonTokens: Token[] = [
     symbol: 'USDT',
     name: 'Tether USD',
     decimals: 6,
+    chainId: 1,
     price: 1
   }
 ];
@@ -123,4 +131,3 @@ export const findArbitrageOpportunities = async (
 // Export additional DEX API functions
 export { dexManager } from './dex/DEXManager';
 export type { SwapOptions } from './dex/interfaces';
-

@@ -1,3 +1,4 @@
+
 import { Address } from "viem";
 
 declare global {
@@ -14,6 +15,9 @@ export interface Wallet {
   connected: boolean;
   type: WalletType;
 }
+
+// For backward compatibility with existing code
+export type WalletInfo = Wallet;
 
 // Network types
 export interface Network {
@@ -46,6 +50,7 @@ export interface DEX {
   id: string;
   name: string;
   logo?: string;
+  icon?: string; // Added for backward compatibility
   active: boolean;
   supportedChainIds: number[];
   version?: string;
@@ -72,6 +77,20 @@ export interface ArbitrageOpportunity {
   dexPath?: string[];       // Array of DEX IDs in path
   riskLevel?: 'low' | 'medium' | 'high';
   confidenceScore?: number; // 0-100 value indicating confidence
+}
+
+// Transaction types
+export interface Transaction {
+  id: string;
+  hash: string;
+  type: 'swap' | 'approval' | 'flashloan' | 'arbitrage';
+  status: 'pending' | 'confirmed' | 'failed';
+  timestamp: number;
+  value: string;
+  gasUsed?: string;
+  from: string;
+  to: string;
+  details?: any;
 }
 
 export {};

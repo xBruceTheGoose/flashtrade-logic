@@ -268,7 +268,7 @@ class PriceMonitoringService {
         priceHistoryStorage.addPricePoint(token0Address, pricePoint);
         
         // Check for arbitrage opportunities
-        this.checkForArbitrageOpportunities();
+        this.scanForArbitrageOpportunities();
       }
     } catch (error) {
       console.error(`Error handling WebSocket price for ${dex.name}:`, error);
