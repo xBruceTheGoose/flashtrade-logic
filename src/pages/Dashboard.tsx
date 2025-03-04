@@ -5,7 +5,7 @@ import GlassCard from '@/components/ui/GlassCard';
 import { Progress } from '@/components/ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { toast } from '@/hooks/use-toast';
-import { ArrowUpRight, Wallet, RefreshCw, Eye, Clock, BarChart3, Zap } from 'lucide-react';
+import { ArrowUpRight, Wallet, RefreshCw, Eye, Clock, BarChart3, Zap, Settings } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import WalletPanel from '@/components/dashboard/WalletPanel';
 import ArbitrageOpportunitiesPanel from '@/components/dashboard/ArbitrageOpportunitiesPanel';
@@ -17,6 +17,7 @@ import DEXPanel from '@/components/DEXPanel';
 import { TradeExecutionRecord } from '@/utils/arbitrage/types';
 import { tradeExecutionStorage } from '@/utils/arbitrage/storage';
 import { Badge } from '@/components/ui/badge';
+import TradeConfigurationPanel from '@/components/trades/TradeConfigurationPanel';
 
 const Dashboard = () => {
   const { wallet, refreshBalance } = useWallet();
@@ -112,11 +113,15 @@ const Dashboard = () => {
         />
       </div>
       
-      <Tabs defaultValue="config" className="w-full">
-        <TabsList className="w-full grid grid-cols-3 mb-4">
-          <TabsTrigger value="config">
+      <Tabs defaultValue="advanced-config" className="w-full">
+        <TabsList className="w-full grid grid-cols-4 mb-4">
+          <TabsTrigger value="advanced-config">
+            <Settings className="h-4 w-4 mr-2" />
+            <span>Advanced Configuration</span>
+          </TabsTrigger>
+          <TabsTrigger value="basic-config">
             <Eye className="h-4 w-4 mr-2" />
-            <span>Trade Configuration</span>
+            <span>Basic Configuration</span>
           </TabsTrigger>
           <TabsTrigger value="history">
             <Clock className="h-4 w-4 mr-2" />
@@ -128,7 +133,11 @@ const Dashboard = () => {
           </TabsTrigger>
         </TabsList>
         
-        <TabsContent value="config">
+        <TabsContent value="advanced-config">
+          <TradeConfigurationPanel />
+        </TabsContent>
+        
+        <TabsContent value="basic-config">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <TradeConfigPanel />
             <DEXPanel />
