@@ -1,10 +1,10 @@
-
 import { Token, DEX, ArbitrageOpportunity } from '@/types';
 import { dexManager } from '@/utils/dex/DEXManager';
 import { priceHistoryStorage } from './storage';
 import { flashloanService } from '@/utils/flashloan';
 import { blockchain } from '@/utils/blockchain';
 import { estimateGasCost } from '@/utils/arbitrage';
+import { tradeExecutor } from '@/utils/arbitrage/tradeExecutor';
 import { v4 as uuidv4 } from 'uuid';
 
 // Risk levels for arbitrage opportunities
@@ -689,6 +689,13 @@ export class ArbitrageDetectionEngine {
             
             if (opportunity) {
               opportunities.push(opportunity);
+              
+              // Try to auto-execute if enabled
+              try {
+                await tradeExecutor.autoExecuteTrade(opportunity);
+              } catch (error) {
+                console.error('Error auto-executing trade:', error);
+              }
             }
           }
         }
