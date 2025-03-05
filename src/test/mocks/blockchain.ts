@@ -250,9 +250,9 @@ export class MockSigner extends ethers.Signer {
   private _address = '0x1234567890123456789012345678901234567890';
   
   constructor() {
-    const provider = new MockProvider();
-    super(provider);
-    this._mockProvider = provider;
+    super();
+    this._mockProvider = new MockProvider();
+    this.provider = this._mockProvider;
   }
   
   connect(provider: ethers.providers.Provider): ethers.Signer {
