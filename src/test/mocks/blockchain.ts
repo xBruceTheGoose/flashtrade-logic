@@ -21,6 +21,15 @@ export class MockProvider implements ethers.providers.Provider {
     return ethers.utils.parseEther('10.0');
   }
   
+  // Add the missing getFeeData method
+  async getFeeData() {
+    return {
+      maxFeePerGas: ethers.BigNumber.from('100000000000'),
+      maxPriorityFeePerGas: ethers.BigNumber.from('1000000000'),
+      gasPrice: ethers.BigNumber.from('50000000000'),
+    };
+  }
+  
   // Required implementations from Provider interface
   async getTransactionCount(addressOrName: string, blockTag?: ethers.providers.BlockTag): Promise<number> {
     return 10;
@@ -72,7 +81,6 @@ export class MockProvider implements ethers.providers.Provider {
       r: '0x',
       s: '0x',
       v: 27,
-      creates: null,
       accessList: null,
       type: 0,
       to: '0xmockreceiver'
@@ -136,7 +144,6 @@ export class MockProvider implements ethers.providers.Provider {
       r: '0x',
       s: '0x',
       v: 27,
-      creates: null,
       accessList: null,
       type: 0,
       to: '0xmockreceiver'
@@ -180,6 +187,7 @@ export class MockProvider implements ethers.providers.Provider {
       timestamp: Date.now(),
       nonce: '0x0',
       difficulty: 0,
+      _difficulty: ethers.BigNumber.from(0), // Added the missing _difficulty property
       gasLimit: ethers.BigNumber.from(8000000),
       gasUsed: ethers.BigNumber.from(21000),
       miner: '0xmockminer',
@@ -189,7 +197,8 @@ export class MockProvider implements ethers.providers.Provider {
     };
   }
   
-  async getBlockWithTransactions(blockHashOrBlockTag: ethers.providers.BlockTag | string): Promise<ethers.providers.BlockWithTransactions> {
+  async getBlockWithTransactions(blockHashOrBlockTag: ethers.providers.BlockTag | string): Promise<any> {
+    // Use 'any' type to avoid the namespace issue
     return {
       hash: '0xmockblockhash',
       parentHash: '0xmockparenthash',
@@ -197,6 +206,7 @@ export class MockProvider implements ethers.providers.Provider {
       timestamp: Date.now(),
       nonce: '0x0',
       difficulty: 0,
+      _difficulty: ethers.BigNumber.from(0),
       gasLimit: ethers.BigNumber.from(8000000),
       gasUsed: ethers.BigNumber.from(21000),
       miner: '0xmockminer',
@@ -240,16 +250,28 @@ export class MockProvider implements ethers.providers.Provider {
   }
 }
 
+// Create a properly typed provider for MockSigner
 export class MockSigner extends ethers.Signer {
-  provider = new MockProvider();
-  address = '0x1234567890123456789012345678901234567890';
+  // Use the updated MockProvider
+  private _provider = new MockProvider();
+  private _address = '0x1234567890123456789012345678901234567890';
+  
+  constructor() {
+    super();
+  }
+  
+  // Override the getter to provide the provider
+  get provider(): ethers.providers.Provider {
+    return this._provider;
+  }
   
   connect(provider: ethers.providers.Provider): ethers.Signer {
-    return this;
+    // Return a new instance rather than 'this'
+    return new MockSigner();
   }
   
   async getAddress(): Promise<string> {
-    return this.address;
+    return this._address;
   }
   
   async signMessage(message: string | ethers.utils.Bytes): Promise<string> {

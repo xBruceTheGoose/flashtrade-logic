@@ -41,10 +41,10 @@ jest.mock('@/utils/flashloan', () => ({
 jest.mock('@/utils/contracts/arbitrageExecutor', () => ({
   arbitrageExecutorService: {
     isUserAuthorized: jest.fn().mockResolvedValue(true),
-    executeArbitrage: jest.fn().mockResolvedValue({
+    executeArbitrage: jest.fn().mockImplementation(() => Promise.resolve({
       success: true,
       transactionHash: '0xmockarbitragetx',
-    }),
+    })),
   },
 }));
 
@@ -113,11 +113,12 @@ describe('Arbitrage End-to-End Flow', () => {
 
   it('should handle errors during execution', async () => {
     // Mock failure for this test only
-    const mockExecute = arbitrageExecutorService.executeArbitrage as jest.Mock;
-    mockExecute.mockResolvedValueOnce({
-      success: false,
-      error: 'Execution failed due to price movement',
-    });
+    (arbitrageExecutorService.executeArbitrage as jest.Mock).mockImplementationOnce(() => 
+      Promise.resolve({
+        success: false,
+        error: 'Execution failed due to price movement',
+      })
+    );
     
     // 1. Scan for opportunities
     const opportunities = await scanForArbitrageOpportunities(mockDexes, mockTokens);
@@ -134,8 +135,7 @@ describe('Arbitrage End-to-End Flow', () => {
   
   it('should handle wallet not connected', async () => {
     // Mock wallet not connected for this test only
-    const mockConnected = blockchain.isWalletConnected as jest.Mock;
-    mockConnected.mockReturnValueOnce(false);
+    (blockchain.isWalletConnected as jest.Mock).mockImplementationOnce(() => false);
     
     // 1. Scan for opportunities
     const opportunities = await scanForArbitrageOpportunities(mockDexes, mockTokens);
