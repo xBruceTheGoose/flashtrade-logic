@@ -27,7 +27,7 @@ export class MockProvider implements ethers.providers.Provider {
       maxFeePerGas: ethers.BigNumber.from('100000000000'),
       maxPriorityFeePerGas: ethers.BigNumber.from('1000000000'),
       gasPrice: ethers.BigNumber.from('50000000000'),
-      lastBaseFeePerGas: ethers.BigNumber.from('50000000000'), // Add the missing property
+      lastBaseFeePerGas: ethers.BigNumber.from('50000000000'),
     };
   }
   
@@ -250,23 +250,22 @@ export class MockProvider implements ethers.providers.Provider {
   }
 }
 
-// Fix the MockSigner to properly extend ethers.Signer
+// Fix the MockSigner class to properly handle the provider property
 export class MockSigner extends ethers.Signer {
-  // Define provider as a property, not a getter
-  readonly provider: ethers.providers.Provider;
+  // Don't redeclare provider - we'll use the one from the base class
+  private _mockProvider: MockProvider;
   private _address = '0x1234567890123456789012345678901234567890';
   
   constructor() {
-    super();
-    // Initialize the provider property directly
-    this.provider = new MockProvider();
+    // Initialize with a new MockProvider
+    const provider = new MockProvider();
+    super(provider);
+    this._mockProvider = provider;
   }
   
   connect(provider: ethers.providers.Provider): ethers.Signer {
     const signer = new MockSigner();
-    // We use any to bypass TypeScript's readonly check
-    (signer as any).provider = provider;
-    return signer;
+    return signer.connect(provider);
   }
   
   async getAddress(): Promise<string> {
