@@ -1,11 +1,10 @@
-
 import { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Save, Trash2, AlertTriangle, Shield } from 'lucide-react';
+import { Plus, Save, Trash2, AlertTriangle, Shield, Info } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { sanitizeStringInput, secureLocalStorage } from '@/utils/validation';
 import { MAX_CONFIGS } from '@/utils/arbitrage/constants';

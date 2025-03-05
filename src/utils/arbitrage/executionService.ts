@@ -1,4 +1,3 @@
-
 import { ArbitrageOpportunity } from '@/types';
 import { 
   ExecutionOptions, 
@@ -13,21 +12,20 @@ import { executionConfigManager } from './executionConfig';
 import { CIRCUIT_BREAKER_THRESHOLDS, API_RATE_LIMITS } from './constants';
 import { rateLimiters } from '@/utils/blockchain/priceMonitoring/rateLimit';
 import { blockchain } from '@/utils/blockchain';
+import { ethers } from 'ethers';
 
-// Default execution options
 export const DEFAULT_EXECUTION_OPTIONS: ExecutionOptions = {
-  strategy: 'balanced',
+  strategy: 'sequential',
   priority: 'medium',
   useFlashloan: false,
   flashloanProvider: 'aave',
   maxGasPrice: '100',
   gasPriceMultiplier: 1.1,
   maxRetries: 2,
-  retryDelay: 15000, // 15 seconds
-  slippageTolerance: 0.5 // 0.5%
+  retryDelay: 15000,
+  slippageTolerance: 0.5
 };
 
-// Initialize rate limiters for the execution service
 const tradeRateLimiter = rateLimiters.register(
   'trade-execution', 
   API_RATE_LIMITS.trade.maxRequests, 
@@ -48,10 +46,6 @@ interface SimulationResult {
   error?: string;
 }
 
-/**
- * Trade Execution Service
- * Handles execution of arbitrage opportunities with security measures
- */
 class ExecutionService {
   private emergencyStopActive: boolean = false;
   private circuitBreakerTriggered: boolean = false;
@@ -62,16 +56,10 @@ class ExecutionService {
     console.log('Execution Service initialized with security measures');
   }
 
-  /**
-   * Checks if emergency stop is active
-   */
   isEmergencyStopActive(): boolean {
     return this.emergencyStopActive;
   }
   
-  /**
-   * Activates emergency stop
-   */
   activateEmergencyStop(reason: string): void {
     console.warn('EMERGENCY STOP ACTIVATED:', reason);
     this.emergencyStopActive = true;
@@ -83,9 +71,6 @@ class ExecutionService {
     });
   }
   
-  /**
-   * Deactivates emergency stop
-   */
   deactivateEmergencyStop(): void {
     console.log('Emergency stop deactivated');
     this.emergencyStopActive = false;
@@ -96,9 +81,6 @@ class ExecutionService {
     });
   }
   
-  /**
-   * Reset circuit breaker
-   */
   resetCircuitBreaker(): void {
     this.circuitBreakerTriggered = false;
     this.lastCircuitBreakerEvent = null;
@@ -109,9 +91,6 @@ class ExecutionService {
     });
   }
   
-  /**
-   * Get circuit breaker status
-   */
   getCircuitBreakerStatus(): { triggered: boolean; event: CircuitBreakerEvent | null } {
     return {
       triggered: this.circuitBreakerTriggered,
@@ -119,9 +98,6 @@ class ExecutionService {
     };
   }
   
-  /**
-   * Trigger circuit breaker
-   */
   private triggerCircuitBreaker(event: CircuitBreakerEvent): void {
     if (!this.circuitBreakerTriggered) {
       console.warn('CIRCUIT BREAKER TRIGGERED:', event);
@@ -136,9 +112,6 @@ class ExecutionService {
     }
   }
 
-  /**
-   * Simulate transaction to verify its outcome and safety
-   */
   private async simulateTransaction(
     opportunity: ArbitrageOpportunity,
     options: Partial<ExecutionOptions> = {}
@@ -146,25 +119,18 @@ class ExecutionService {
     console.log('Simulating transaction for opportunity:', opportunity.id);
     
     try {
-      // In a real implementation, this would use a blockchain simulation service
-      // like Tenderly or a local fork of the blockchain to simulate the transaction
-      
-      // For now, we'll use a simplified simulation
       const config = executionConfigManager.getExecutionConfig();
       const expectedProfit = opportunity.estimatedProfit;
       
-      // Calculate gas cost - in reality, this would be from the simulation
       const gasPrice = await blockchain.getCurrentProvider().getGasPrice();
       const estimatedGasUsed = "150000";
       const gasCost = gasPrice.mul(estimatedGasUsed);
-      const gasCostEth = parseFloat(blockchain.utils.formatEther(gasCost));
+      const gasCostEth = parseFloat(ethers.utils.formatEther(gasCost));
       
-      // Check if gas cost would make the trade unprofitable
       const profitValue = parseFloat(expectedProfit.split(' ')[0]);
-      const profitInEth = profitValue / (opportunity.tokenIn.price || 1); // Rough conversion
+      const profitInEth = profitValue / (opportunity.tokenIn.price || 1);
       
       if (gasCostEth > profitInEth * 0.5) {
-        // Gas cost is more than 50% of expected profit
         return {
           success: false,
           expectedProfit,
@@ -173,10 +139,8 @@ class ExecutionService {
         };
       }
       
-      // Check for potential slippage issues
       const slippageTolerance = options.slippageTolerance || config.slippageTolerance;
-      // In a real implementation, we would check the simulation result vs expected
-      const simulatedSlippage = Math.random() * 2; // Simulated slippage between 0-2%
+      const simulatedSlippage = Math.random() * 2;
       
       if (simulatedSlippage > slippageTolerance) {
         return {
@@ -187,11 +151,9 @@ class ExecutionService {
         };
       }
       
-      // Calculate actual profit after gas and slippage
       const actualProfitValue = profitValue * (1 - (simulatedSlippage / 100)) - gasCostEth;
       const actualProfit = `${actualProfitValue.toFixed(6)} ${opportunity.tokenIn.symbol}`;
       
-      // Final check for minimum profitability
       if (actualProfitValue <= 0) {
         return {
           success: false,
@@ -218,41 +180,32 @@ class ExecutionService {
     }
   }
 
-  /**
-   * Validate trade parameters for security
-   */
   private validateTradeParameters(
     opportunity: ArbitrageOpportunity,
     options: Partial<ExecutionOptions> = {}
   ): { valid: boolean; error?: string } {
-    // Check for emergency stop
     if (this.emergencyStopActive) {
       return { valid: false, error: 'Emergency stop is active' };
     }
     
-    // Check for circuit breaker
     if (this.circuitBreakerTriggered) {
       return { valid: false, error: 'Circuit breaker triggered: ' + this.lastCircuitBreakerEvent?.reason };
     }
     
-    // Validate opportunity
     if (!opportunity || !opportunity.id) {
       return { valid: false, error: 'Invalid opportunity' };
     }
     
-    // Validate tokens
     if (!opportunity.tokenIn || !opportunity.tokenOut) {
       return { valid: false, error: 'Invalid tokens in opportunity' };
     }
     
-    // Validate DEXes
     if (!opportunity.sourceDex || !opportunity.targetDex) {
       return { valid: false, error: 'Invalid DEXes in opportunity' };
     }
     
     const config = executionConfigManager.getExecutionConfig();
     
-    // Check trade size limits
     const tradeSize = parseFloat(opportunity.tradeSize || '0');
     if (isNaN(tradeSize) || tradeSize <= 0) {
       return { valid: false, error: 'Invalid trade size' };
@@ -262,7 +215,6 @@ class ExecutionService {
       return { valid: false, error: `Trade size exceeds maximum allowed (${config.maxTradeSize})` };
     }
     
-    // Validate slippage tolerance
     const slippage = options.slippageTolerance || config.slippageTolerance;
     if (isNaN(slippage) || slippage < 0.1 || slippage > 5.0) {
       return { valid: false, error: 'Invalid slippage tolerance' };
@@ -271,14 +223,10 @@ class ExecutionService {
     return { valid: true };
   }
 
-  /**
-   * Execute a trade with all security measures
-   */
   async executeTrade(
     opportunity: ArbitrageOpportunity,
     options: Partial<ExecutionOptions> = {}
   ): Promise<ExecutionResult> {
-    // Rate limiting check
     try {
       if (options.useFlashloan) {
         await flashloanRateLimiter.waitForAvailability(5000);
@@ -299,7 +247,6 @@ class ExecutionService {
       };
     }
     
-    // Validate parameters
     const validation = this.validateTradeParameters(opportunity, options);
     if (!validation.valid) {
       toast({
@@ -315,7 +262,6 @@ class ExecutionService {
       };
     }
     
-    // Create record
     const record = tradeExecutionStorage.addRecord({
       opportunityId: opportunity.id,
       timestamp: Date.now(),
@@ -333,7 +279,6 @@ class ExecutionService {
     });
     
     try {
-      // Simulate transaction first
       tradeExecutionStorage.updateRecord(record.id, {
         status: 'simulating'
       });
@@ -361,7 +306,6 @@ class ExecutionService {
         };
       }
       
-      // Check for extreme market conditions (circuit breaker)
       const expectedProfitValue = parseFloat(opportunity.estimatedProfit.split(' ')[0]);
       const actualProfitValue = parseFloat(simulation.actualProfit?.split(' ')[0] || '0');
       
@@ -390,15 +334,12 @@ class ExecutionService {
         };
       }
       
-      // Proceed with execution
       tradeExecutionStorage.updateRecord(record.id, {
         status: 'executing'
       });
       
-      // Simulate execution for demo
       await new Promise(resolve => setTimeout(resolve, 2000));
       
-      // 80% success rate for simulation
       const success = Math.random() > 0.2;
       
       if (success) {
@@ -468,11 +409,7 @@ class ExecutionService {
     }
   }
 
-  /**
-   * Auto-execute a trade if it meets criteria
-   */
   async autoExecuteTrade(opportunity: ArbitrageOpportunity): Promise<boolean> {
-    // Safety checks
     if (this.emergencyStopActive) {
       console.log('Auto-execution stopped: Emergency stop is active');
       return false;
@@ -485,12 +422,10 @@ class ExecutionService {
     
     const config = executionConfigManager.getExecutionConfig();
     
-    // Check if auto-execute is enabled
     if (!config.autoExecute) {
       return false;
     }
     
-    // Check if the opportunity meets profit threshold
     const profitStr = opportunity.estimatedProfit;
     const profitValue = parseFloat(profitStr.split(' ')[0]);
     
@@ -499,13 +434,11 @@ class ExecutionService {
       return false;
     }
     
-    // Check risk level
     if (opportunity.riskLevel === 'high' && config.riskTolerance === 'low') {
       console.log('High risk opportunity skipped due to low risk tolerance');
       return false;
     }
     
-    // Execute the trade
     try {
       console.log('Auto-executing trade for opportunity:', opportunity.id);
       const result = await this.executeTrade(opportunity);
@@ -517,5 +450,4 @@ class ExecutionService {
   }
 }
 
-// Export singleton instance
 export const executionService = new ExecutionService();

@@ -34,7 +34,8 @@ class QueueManager {
         tradeSize: opportunity.tradeSize || '0',
         expectedProfit: opportunity.estimatedProfit,
         status: 'pending',
-        success: false
+        success: false,
+        amountIn: opportunity.tradeSize || '0'
       });
       
       toast({

@@ -1,3 +1,4 @@
+
 export type ExecutionStrategyType = 'sequential' | 'concurrent' | 'priority';
 
 export interface ExecutionOptions {
@@ -51,6 +52,11 @@ export interface TradeExecutionRecord {
   executionTime?: number;
   error?: string;
   amountIn: string;
+  // Additional properties needed by components
+  profitAmount?: string;
+  profitPercentage?: string;
+  gasUsed?: string;
+  txHash?: string; // Alias for transactionHash for backward compatibility
 }
 
 export interface RetryConfig {
@@ -106,4 +112,16 @@ export interface EnhancedExecutionResult extends ExecutionResult {
     simulationPassed: boolean;
     circuitBreakerStatus: string;
   };
+}
+
+// Add missing type
+export interface ExecutionConfig {
+  minProfitPercentage: number;
+  maxTradeSize: number;
+  slippageTolerance: number;
+  gasPrice: string;
+  autoExecute: boolean;
+  riskTolerance: 'low' | 'medium' | 'high';
+  executionStrategy: ExecutionStrategyType;
+  maxConcurrentTrades: number;
 }

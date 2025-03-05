@@ -78,7 +78,7 @@ export function validateSlippageTolerance(value: string | number): number {
     toast({
       title: "Input Adjusted",
       description: `Slippage tolerance adjusted to valid range (${MIN_SLIPPAGE}-${MAX_SLIPPAGE}%)`,
-      variant: "warning"
+      variant: "default" // Changed from "warning" to "default"
     });
   }
   
