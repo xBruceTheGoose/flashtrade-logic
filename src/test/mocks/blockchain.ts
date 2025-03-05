@@ -21,12 +21,13 @@ export class MockProvider implements ethers.providers.Provider {
     return ethers.utils.parseEther('10.0');
   }
   
-  // Add the missing getFeeData method
-  async getFeeData() {
+  // Add the correctly typed getFeeData method
+  async getFeeData(): Promise<ethers.providers.FeeData> {
     return {
       maxFeePerGas: ethers.BigNumber.from('100000000000'),
       maxPriorityFeePerGas: ethers.BigNumber.from('1000000000'),
       gasPrice: ethers.BigNumber.from('50000000000'),
+      lastBaseFeePerGas: ethers.BigNumber.from('50000000000'), // Add the missing property
     };
   }
   
@@ -187,7 +188,7 @@ export class MockProvider implements ethers.providers.Provider {
       timestamp: Date.now(),
       nonce: '0x0',
       difficulty: 0,
-      _difficulty: ethers.BigNumber.from(0), // Added the missing _difficulty property
+      _difficulty: ethers.BigNumber.from(0),
       gasLimit: ethers.BigNumber.from(8000000),
       gasUsed: ethers.BigNumber.from(21000),
       miner: '0xmockminer',
@@ -198,7 +199,6 @@ export class MockProvider implements ethers.providers.Provider {
   }
   
   async getBlockWithTransactions(blockHashOrBlockTag: ethers.providers.BlockTag | string): Promise<any> {
-    // Use 'any' type to avoid the namespace issue
     return {
       hash: '0xmockblockhash',
       parentHash: '0xmockparenthash',
@@ -250,24 +250,23 @@ export class MockProvider implements ethers.providers.Provider {
   }
 }
 
-// Create a properly typed provider for MockSigner
+// Fix the MockSigner to properly extend ethers.Signer
 export class MockSigner extends ethers.Signer {
-  // Use the updated MockProvider
-  private _provider = new MockProvider();
+  // Define provider as a property, not a getter
+  readonly provider: ethers.providers.Provider;
   private _address = '0x1234567890123456789012345678901234567890';
   
   constructor() {
     super();
-  }
-  
-  // Override the getter to provide the provider
-  get provider(): ethers.providers.Provider {
-    return this._provider;
+    // Initialize the provider property directly
+    this.provider = new MockProvider();
   }
   
   connect(provider: ethers.providers.Provider): ethers.Signer {
-    // Return a new instance rather than 'this'
-    return new MockSigner();
+    const signer = new MockSigner();
+    // We use any to bypass TypeScript's readonly check
+    (signer as any).provider = provider;
+    return signer;
   }
   
   async getAddress(): Promise<string> {
