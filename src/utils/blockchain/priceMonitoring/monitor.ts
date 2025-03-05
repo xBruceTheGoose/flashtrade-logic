@@ -33,7 +33,7 @@ class PriceMonitoringService {
   private arbitrageScanInterval: number = 60000; // 1 minute
 
   constructor() {
-    this.rateLimiter = new RateLimiter(this.config.maxRequestsPerMinute, 60000); // Add second parameter (timeWindowMs)
+    this.rateLimiter = new RateLimiter(this.config.maxRequestsPerMinute, '60000'); // Convert to string
     priceHistoryStorage.setMaxHistoryLength(this.config.maxPriceHistoryLength);
     
     // Initialize arbitrage detection engine with our configuration
@@ -52,7 +52,7 @@ class PriceMonitoringService {
     
     // Update rate limiter if maxRequestsPerMinute changed
     if (config.maxRequestsPerMinute) {
-      this.rateLimiter = new RateLimiter(this.config.maxRequestsPerMinute, 60000); // Add second parameter (timeWindowMs)
+      this.rateLimiter = new RateLimiter(this.config.maxRequestsPerMinute, '60000'); // Convert to string
     }
     
     // Update price history storage if maxPriceHistoryLength changed
