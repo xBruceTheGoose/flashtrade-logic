@@ -37,7 +37,6 @@ const PresetManager = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Load saved presets from secure storage
   useEffect(() => {
     try {
       const savedPresets = secureLocalStorage.getItem<Preset[]>('trade_config_presets', []);
@@ -56,7 +55,6 @@ const PresetManager = ({
     setSelectedPreset(presetId);
     const preset = presets.find(p => p.id === presetId);
     if (preset) {
-      // Validate preset data before using it
       if (!preset.name || !preset.config) {
         toast({
           title: 'Invalid Preset',
@@ -67,7 +65,6 @@ const PresetManager = ({
       }
       
       setConfigName(preset.name);
-      // In a real app, we'd load the preset configuration here
       toast({
         title: 'Preset Loaded',
         description: `Loaded configuration: ${preset.name}`
@@ -85,10 +82,8 @@ const PresetManager = ({
       return;
     }
     
-    // Sanitize name to prevent security issues
     const sanitizedName = sanitizeStringInput(configName, 50);
     
-    // Check if we've reached the maximum number of presets
     if (presets.length >= MAX_CONFIGS && !presets.some(p => p.name === sanitizedName)) {
       toast({
         title: 'Preset Limit Reached',
@@ -98,7 +93,6 @@ const PresetManager = ({
       return;
     }
     
-    // Create new preset or update existing
     const existingIndex = presets.findIndex(p => p.name === sanitizedName);
     const newPreset: Preset = {
       id: existingIndex >= 0 ? presets[existingIndex].id : Date.now().toString(),
@@ -111,7 +105,6 @@ const PresetManager = ({
       let updatedPresets: Preset[];
       
       if (existingIndex >= 0) {
-        // Update existing preset
         updatedPresets = [...presets];
         updatedPresets[existingIndex] = newPreset;
         
@@ -120,7 +113,6 @@ const PresetManager = ({
           description: `Configuration "${sanitizedName}" has been updated`
         });
       } else {
-        // Add new preset
         updatedPresets = [...presets, newPreset];
         
         toast({
@@ -132,7 +124,6 @@ const PresetManager = ({
       setPresets(updatedPresets);
       secureLocalStorage.setItem('trade_config_presets', updatedPresets);
       
-      // Call the onSave function passed from parent
       onSave();
       
       setShowNewPreset(false);
@@ -190,7 +181,7 @@ const PresetManager = ({
         <div className="flex items-center justify-between">
           <div className="flex items-center">
             <Label className="font-medium">Configuration Presets</Label>
-            <Shield className="h-4 w-4 ml-2 text-blue-500" title="Securely stored configurations" />
+            <Shield className="h-4 w-4 ml-2 text-blue-500" aria-label="Securely stored configurations" />
           </div>
           <Button
             variant="outline"
