@@ -121,10 +121,8 @@ export function safeJsonParse(jsonString: string): any {
 
 /**
  * Store data securely in localStorage with encryption
- * @param key - Storage key
- * @param data - Data to store
  */
-export function secureLocalStorage = {
+export const secureLocalStorage = {
   // Set item with optional encryption
   setItem: (key: string, value: any): void => {
     try {
