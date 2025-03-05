@@ -1,0 +1,105 @@
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to deploy to'
+        required: true
+        default: 'staging'
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Run linting
+      run: npm run lint || echo "Linting issues detected"
+      
+    - name: Run type checking
+      run: npm run typecheck
+      
+    - name: Build application
+      run: |
+        if [ "${{ github.event.inputs.environment }}" == "production" ] || [ "${{ github.event_name }}" == "push" ]; then
+          npm run build -- --mode production
+        else
+          npm run build -- --mode staging
+        fi
+      
+    - name: Deploy to Netlify
+      uses: nwtgck/actions-netlify@v2
+      with:
+        publish-dir: './dist'
+        production-branch: main
+        deploy-message: "Deploy from GitHub Actions"
+        enable-pull-request-comment: true
+        enable-commit-comment: true
+        overwrites-pull-request-comment: true
+      env:
+        NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+        NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+      timeout-minutes: 5
+        
+    - name: Create backup
+      run: node scripts/backup.js
+      
+    - name: Persist backup artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: backup-artifacts
+        path: backups/
+        retention-days: 30
+
+  deploy-contracts:
+    needs: build-and-deploy
+    if: github.event_name == 'workflow_dispatch' && github.event.inputs.environment == 'production'
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+      
+    - name: Use Node.js 18.x
+      uses: actions/setup-node@v3
+      with:
+        node-version: 18.x
+        cache: 'npm'
+        
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Deploy contracts to production networks
+      run: |
+        echo "Deploying contracts to production networks..."
+        npx hardhat run scripts/deploy.js --network ethereum
+        npx hardhat run scripts/deploy.js --network polygon
+        npx hardhat run scripts/deploy.js --network arbitrum
+      env:
+        PRIVATE_KEY: ${{ secrets.DEPLOYMENT_PRIVATE_KEY }}
+        INFURA_API_KEY: ${{ secrets.INFURA_API_KEY }}
+        ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+        
+    - name: Persist deployment artifacts
+      uses: actions/upload-artifact@v3
+      with:
+        name: deployment-artifacts
+        path: deployments/
+        retention-days: 30

@@ -1,3 +1,4 @@
+
 # Welcome to your Lovable project
 
 ## Project info
@@ -36,34 +37,100 @@ npm i
 npm run dev
 ```
 
-**Edit a file directly in GitHub**
+## Deployment Guide
 
-- Navigate to the desired file(s).
-- Click the "Edit" button (pencil icon) at the top right of the file view.
-- Make your changes and commit the changes.
+This project supports multiple deployment options and environments.
 
-**Use GitHub Codespaces**
+### Frontend Deployment
 
-- Navigate to the main page of your repository.
-- Click on the "Code" button (green button) near the top right.
-- Select the "Codespaces" tab.
-- Click on "New codespace" to launch a new Codespace environment.
-- Edit files directly within the Codespace and commit and push your changes once you're done.
+#### Deploy to Netlify
+
+1. Connect your repository to Netlify
+2. Set the build command to `npm run build`
+3. Set the publish directory to `dist`
+4. Add environment variables as needed
+
+#### Deploy to Vercel
+
+1. Connect your repository to Vercel
+2. The Vercel configuration file (`vercel.json`) is already set up
+3. Vercel will automatically detect the correct settings
+
+#### Manual Deployment
+
+```sh
+# Build for production
+npm run build
+
+# The dist folder can be deployed to any static hosting service
+```
+
+### Smart Contract Deployment
+
+#### Deploy to a specific network
+
+```sh
+# Deploy to Ethereum mainnet
+npx hardhat run scripts/deploy.js --network ethereum
+
+# Deploy to Polygon
+npx hardhat run scripts/deploy.js --network polygon
+```
+
+#### Deploy to all networks
+
+```sh
+# Deploy to all configured networks
+node scripts/deploy-all-networks.js
+```
+
+### Environment Configuration
+
+The application uses different configurations based on the environment:
+
+- `development`: Local development environment
+- `staging`: Pre-production testing environment
+- `production`: Production environment
+
+To specify the environment during build:
+
+```sh
+# Build for production
+npm run build -- --mode production
+
+# Build for staging
+npm run build -- --mode staging
+```
+
+### Custom Domain Setup
+
+1. Configure your DNS provider by adding:
+   - An A record pointing to your hosting provider's IP
+   - A CNAME record for the www subdomain
+
+2. In your hosting provider (Netlify/Vercel):
+   - Go to domain settings
+   - Add your custom domain
+   - Enable HTTPS
+
+### Backup and Recovery
+
+Run the backup script to create archives of critical project files:
+
+```sh
+node scripts/backup.js
+```
+
+Backups will be stored in the `backups` directory.
 
 ## What technologies are used for this project?
 
-This project is built with .
+This project is built with:
 
 - Vite
 - TypeScript
 - React
 - shadcn-ui
 - Tailwind CSS
-
-## How can I deploy this project?
-
-Simply open [Lovable](https://lovable.dev/projects/c174070a-5981-4bb8-8d67-883eddd9729c) and click on Share -> Publish.
-
-## I want to use a custom domain - is that possible?
-
-We don't support custom domains (yet). If you want to deploy your project under your own domain then we recommend using Netlify. Visit our docs for more details: [Custom domains](https://docs.lovable.dev/tips-tricks/custom-domain/)
+- Ethers.js for blockchain interaction
+- Hardhat for smart contract development
