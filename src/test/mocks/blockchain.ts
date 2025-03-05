@@ -1,4 +1,3 @@
-
 import { ethers } from 'ethers';
 
 export class MockProvider implements ethers.providers.Provider {
@@ -21,7 +20,6 @@ export class MockProvider implements ethers.providers.Provider {
     return ethers.utils.parseEther('10.0');
   }
   
-  // Add the correctly typed getFeeData method
   async getFeeData(): Promise<ethers.providers.FeeData> {
     return {
       maxFeePerGas: ethers.BigNumber.from('100000000000'),
@@ -31,7 +29,6 @@ export class MockProvider implements ethers.providers.Provider {
     };
   }
   
-  // Required implementations from Provider interface
   async getTransactionCount(addressOrName: string, blockTag?: ethers.providers.BlockTag): Promise<number> {
     return 10;
   }
@@ -88,7 +85,6 @@ export class MockProvider implements ethers.providers.Provider {
     };
   }
   
-  // Add listener methods
   on(eventName: ethers.providers.EventType, listener: ethers.providers.Listener): ethers.providers.Provider {
     return this;
   }
@@ -125,7 +121,6 @@ export class MockProvider implements ethers.providers.Provider {
     return this.off(eventName, listener);
   }
   
-  // Additional required methods
   async getTransaction(transactionHash: string): Promise<ethers.providers.TransactionResponse> {
     return {
       hash: transactionHash,
@@ -250,22 +245,20 @@ export class MockProvider implements ethers.providers.Provider {
   }
 }
 
-// Fix the MockSigner class to properly handle the provider property
 export class MockSigner extends ethers.Signer {
-  // Don't redeclare provider - we'll use the one from the base class
   private _mockProvider: MockProvider;
   private _address = '0x1234567890123456789012345678901234567890';
   
   constructor() {
-    // Initialize with a new MockProvider
     const provider = new MockProvider();
     super(provider);
     this._mockProvider = provider;
   }
   
   connect(provider: ethers.providers.Provider): ethers.Signer {
-    const signer = new MockSigner();
-    return signer.connect(provider);
+    const newSigner = new MockSigner();
+    (newSigner as any).provider = provider;
+    return newSigner;
   }
   
   async getAddress(): Promise<string> {
@@ -285,7 +278,6 @@ export class MockSigner extends ethers.Signer {
   }
 }
 
-// Mock blockchain service
 export const mockBlockchainService = {
   getCurrentProvider: jest.fn().mockReturnValue(new MockProvider()),
   getProvider: jest.fn().mockReturnValue(new MockProvider()),
