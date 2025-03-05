@@ -6,3 +6,8 @@ export * from './rateLimit';
 export * from './websocket';
 export * from './types';
 export * from './arbitrageDetection';
+export * from './config';
+export * from './opportunityManager';
+export * from './scanner';
+export * from './wsConnector';
+export * from './pricePoller';
