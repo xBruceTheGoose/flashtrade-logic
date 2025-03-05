@@ -2,6 +2,7 @@
 import { ethers } from 'ethers';
 import { arbitrageExecutorService } from '@/utils/contracts/arbitrageExecutor';
 import { MockProvider, MockSigner } from '@/test/mocks/blockchain';
+import { DEX, Token } from '@/types';
 
 // Mock ethers
 jest.mock('ethers', () => {
@@ -43,13 +44,28 @@ jest.mock('@/hooks/use-toast', () => ({
 }));
 
 describe('ArbitrageExecutorService Integration', () => {
-  const mockSourceDex = { id: 'uniswap-v2', name: 'Uniswap V2', active: true, logo: '' };
-  const mockTargetDex = { id: 'sushiswap', name: 'SushiSwap', active: true, logo: '' };
-  const mockToken = {
+  const mockSourceDex: DEX = { 
+    id: 'uniswap-v2', 
+    name: 'Uniswap V2', 
+    active: true, 
+    logo: '',
+    supportedChainIds: [1, 4, 5]
+  };
+  
+  const mockTargetDex: DEX = { 
+    id: 'sushiswap', 
+    name: 'SushiSwap', 
+    active: true, 
+    logo: '',
+    supportedChainIds: [1, 4, 5]
+  };
+  
+  const mockToken: Token = {
     address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
+    chainId: 1
   };
 
   beforeEach(() => {

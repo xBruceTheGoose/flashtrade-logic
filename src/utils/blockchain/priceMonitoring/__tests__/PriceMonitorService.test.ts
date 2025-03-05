@@ -8,6 +8,7 @@ import { webSocketManager } from '../ws';
 import { blockchain } from '@/utils/blockchain';
 import { availableDEXes } from '@/utils/dex';
 import { toast } from '@/hooks/use-toast';
+import { Token } from '@/types';
 
 // Mock dependencies
 jest.mock('../opportunityManager', () => ({
@@ -53,8 +54,8 @@ jest.mock('@/hooks/use-toast', () => ({
 
 jest.mock('@/utils/dex', () => ({
   availableDEXes: [
-    { id: 'uniswap-v2', name: 'Uniswap V2', active: true, logo: '' },
-    { id: 'sushiswap', name: 'SushiSwap', active: true, logo: '' },
+    { id: 'uniswap-v2', name: 'Uniswap V2', active: true, logo: '', supportedChainIds: [1, 4, 5] },
+    { id: 'sushiswap', name: 'SushiSwap', active: true, logo: '', supportedChainIds: [1, 4, 5] },
   ],
 }));
 
@@ -66,18 +67,20 @@ const mockClearInterval = jest.spyOn(global, 'clearInterval');
 mockClearInterval.mockImplementation(jest.fn());
 
 describe('PriceMonitoringService', () => {
-  const mockTokenA = {
+  const mockTokenA: Token = {
     address: '0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2',
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
+    chainId: 1
   };
   
-  const mockTokenB = {
+  const mockTokenB: Token = {
     address: '0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48',
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
+    chainId: 1
   };
 
   beforeEach(() => {

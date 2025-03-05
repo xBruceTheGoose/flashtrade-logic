@@ -54,6 +54,10 @@ jest.mock('@/utils/dex', () => ({
     hasOpportunity: true,
     profitPercentage: 2.5,
   }),
+  availableDEXes: [
+    { id: 'uniswap-v2', name: 'Uniswap V2', active: true, logo: '', supportedChainIds: [1, 4, 5] },
+    { id: 'sushiswap', name: 'SushiSwap', active: true, logo: '', supportedChainIds: [1, 4, 5] },
+  ]
 }));
 
 // Mock toast
@@ -108,8 +112,9 @@ describe('Arbitrage End-to-End Flow', () => {
   });
 
   it('should handle errors during execution', async () => {
-    // Mock failure
-    arbitrageExecutorService.executeArbitrage.mockResolvedValueOnce({
+    // Mock failure for this test only
+    const mockExecute = arbitrageExecutorService.executeArbitrage as jest.Mock;
+    mockExecute.mockResolvedValueOnce({
       success: false,
       error: 'Execution failed due to price movement',
     });
@@ -128,8 +133,9 @@ describe('Arbitrage End-to-End Flow', () => {
   });
   
   it('should handle wallet not connected', async () => {
-    // Mock wallet not connected
-    blockchain.isWalletConnected.mockReturnValueOnce(false);
+    // Mock wallet not connected for this test only
+    const mockConnected = blockchain.isWalletConnected as jest.Mock;
+    mockConnected.mockReturnValueOnce(false);
     
     // 1. Scan for opportunities
     const opportunities = await scanForArbitrageOpportunities(mockDexes, mockTokens);

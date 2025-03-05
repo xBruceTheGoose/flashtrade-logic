@@ -1,7 +1,7 @@
 
 import { ethers } from 'ethers';
 import { Token, DEX } from '@/types';
-import { IDEXAdapter, TradeRoute, SwapOptions } from '@/utils/dex/interfaces';
+import { IDEXAdapter, TradeRoute } from '@/utils/dex/interfaces';
 
 export class MockDEXAdapter implements IDEXAdapter {
   private dexId: string;
@@ -20,17 +20,22 @@ export class MockDEXAdapter implements IDEXAdapter {
     return this.dexName;
   }
   
+  async isPairSupported(tokenA: Token, tokenB: Token): Promise<boolean> {
+    return true;
+  }
+  
   async getTokenPrice(tokenA: Token, tokenB: Token): Promise<number> {
     return 1000.0;
   }
   
-  async calculateExpectedOutput(
-    tokenIn: Token,
-    tokenOut: Token,
+  async getExpectedOutput(
+    tokenIn: Token, 
+    tokenOut: Token, 
     amountIn: string
   ): Promise<{
     amountOut: string;
     priceImpact: number;
+    path?: string[];
   }> {
     const numericAmount = parseFloat(amountIn);
     return {
@@ -43,7 +48,9 @@ export class MockDEXAdapter implements IDEXAdapter {
     tokenIn: Token,
     tokenOut: Token,
     amountIn: string,
-    options: SwapOptions
+    minAmountOut: string,
+    recipient: string,
+    deadline?: number
   ): Promise<{
     success: boolean;
     transactionHash?: string;
@@ -68,14 +75,34 @@ export class MockDEXAdapter implements IDEXAdapter {
       totalLiquidityUSD: 2000000,
     };
   }
+  
+  async getSwapFee(tokenA: Token, tokenB: Token): Promise<number> {
+    return 30; // 0.3% in basis points
+  }
+  
+  async isReady(): Promise<boolean> {
+    return true;
+  }
 }
 
 export const mockUniswapAdapter = new MockDEXAdapter('uniswap-v2', 'Uniswap V2');
 export const mockSushiswapAdapter = new MockDEXAdapter('sushiswap', 'SushiSwap');
 
 export const mockDexes: DEX[] = [
-  { id: 'uniswap-v2', name: 'Uniswap V2', active: true, logo: '' },
-  { id: 'sushiswap', name: 'SushiSwap', active: true, logo: '' },
+  { 
+    id: 'uniswap-v2', 
+    name: 'Uniswap V2', 
+    active: true, 
+    logo: '', 
+    supportedChainIds: [1, 4, 5] 
+  },
+  { 
+    id: 'sushiswap', 
+    name: 'SushiSwap', 
+    active: true, 
+    logo: '', 
+    supportedChainIds: [1, 4, 5] 
+  },
 ];
 
 export const mockTokens: Token[] = [
@@ -84,6 +111,7 @@ export const mockTokens: Token[] = [
     symbol: 'WETH',
     name: 'Wrapped Ether',
     decimals: 18,
+    chainId: 1,
     price: 2000,
     balance: '10.0',
   },
@@ -92,6 +120,7 @@ export const mockTokens: Token[] = [
     symbol: 'USDC',
     name: 'USD Coin',
     decimals: 6,
+    chainId: 1,
     price: 1,
     balance: '20000.0',
   },
