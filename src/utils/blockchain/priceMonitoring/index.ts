@@ -11,3 +11,4 @@ export * from './opportunityManager';
 export * from './scanner';
 export * from './wsConnector';
 export * from './pricePoller';
+export * from './ws';
