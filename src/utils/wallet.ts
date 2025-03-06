@@ -1,4 +1,3 @@
-
 import { WalletInfo, WalletType } from '@/types';
 import { blockchain } from './blockchain';
 import { toast } from '@/hooks/use-toast';
@@ -50,6 +49,7 @@ export const connectWallet = async (walletType: WalletType): Promise<WalletInfo>
     const chainId = walletType === 'metamask' ? 1 : walletType === 'coinbase' ? 137 : 56;
     
     // Initialize blockchain service with the wallet type
+    // We need to call setWalletType for compatibility, but this will be a no-op in our implementation
     await blockchain.setWalletType(walletType, chainId);
     
     // In a real app, we would get the balance from the blockchain

@@ -1,13 +1,12 @@
-
 import { ethers } from 'ethers';
-import { networks } from './networks';
+import { NETWORKS } from './networks';
 import { logger } from '@/utils/monitoring/loggingService';
 import { analyticsService } from '@/utils/monitoring/analyticsService';
 
 // Types for the blockchain service
 export type NetworkConfig = {
+  id: number;
   name: string;
-  chainId: number;
   rpcUrl: string;
   explorer: string;
   currencySymbol: string;
@@ -25,7 +24,18 @@ class BlockchainService {
   
   constructor() {
     // Initialize with supported networks
-    this.networks = networks;
+    this.networks = {};
+    
+    // Convert NETWORKS format to our internal format
+    Object.values(NETWORKS).forEach(network => {
+      this.networks[network.id] = {
+        id: network.id,
+        name: network.name,
+        rpcUrl: network.rpcUrl,
+        explorer: network.explorer,
+        currencySymbol: network.nativeCurrency.symbol
+      };
+    });
     
     // Check if window.ethereum exists
     this.setupProvider();
@@ -35,14 +45,14 @@ class BlockchainService {
   }
   
   private setupProvider() {
-    if (typeof window !== 'undefined' && window.ethereum) {
-      this.provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+    if (typeof window !== 'undefined' && window?.ethereum) {
+      this.provider = new ethers.providers.Web3Provider(window.ethereum as any, 'any');
       
       // Listen for account changes
-      window.ethereum.on('accountsChanged', this.handleAccountsChanged.bind(this));
+      window.ethereum?.on?.('accountsChanged', this.handleAccountsChanged.bind(this));
       
       // Listen for chain changes
-      window.ethereum.on('chainChanged', this.handleChainChanged.bind(this));
+      window.ethereum?.on?.('chainChanged', this.handleChainChanged.bind(this));
     } else {
       console.warn('No ethereum provider found in window');
       logger.warn('blockchain', 'No ethereum provider found in window');
@@ -197,6 +207,12 @@ class BlockchainService {
     return this.provider;
   }
   
+  // Get provider for a specific chain
+  getProvider(chainId: number): ethers.providers.Provider {
+    const network = this.getNetworkConfig(chainId);
+    return new ethers.providers.JsonRpcProvider(network.rpcUrl);
+  }
+  
   // Get signer
   getSigner(): ethers.Signer | undefined {
     return this.signer;
@@ -224,7 +240,10 @@ class BlockchainService {
   
   // Get network config for chain ID
   getNetworkConfig(chainId: number): NetworkConfig {
-    return this.networks[chainId] || this.networks[1]; // Fallback to mainnet
+    if (!this.networks[chainId]) {
+      throw new Error(`Unsupported network with chain ID: ${chainId}`);
+    }
+    return this.networks[chainId];
   }
   
   // Add connection listener
@@ -251,7 +270,7 @@ class BlockchainService {
   // Switch network
   async switchNetwork(chainId: number): Promise<boolean> {
     try {
-      if (!this.provider || !window.ethereum) {
+      if (!this.provider || typeof window === 'undefined' || !window.ethereum) {
         logger.error('blockchain', 'Cannot switch network: No provider');
         return false;
       }
@@ -265,7 +284,7 @@ class BlockchainService {
       const chainIdHex = '0x' + chainId.toString(16);
       
       try {
-        await window.ethereum.request({
+        await (window.ethereum as any).request({
           method: 'wallet_switchEthereumChain',
           params: [{ chainId: chainIdHex }],
         });
@@ -285,7 +304,7 @@ class BlockchainService {
         // This error code indicates that the chain has not been added to MetaMask.
         if (switchError.code === 4902) {
           try {
-            await window.ethereum.request({
+            await (window.ethereum as any).request({
               method: 'wallet_addEthereumChain',
               params: [
                 {
@@ -331,6 +350,41 @@ class BlockchainService {
       logger.error('blockchain', 'Error in switchNetwork', { error });
       console.error('Error:', error);
       return false;
+    }
+  }
+  
+  // Set wallet type - for compatibility with existing code
+  async setWalletType(walletType: any, chainId: number): Promise<void> {
+    // This method is added for compatibility with existing code
+    // It doesn't need actual implementation as the real blockchain service
+    // handles wallet types differently
+    console.log(`Setting wallet type to ${walletType} on chain ${chainId}`);
+  }
+  
+  // Get token balance
+  async getTokenBalance(
+    tokenAddress: string,
+    ownerAddress: string, 
+    decimals: number
+  ): Promise<string> {
+    try {
+      const provider = this.getCurrentProvider();
+      const tokenContract = new ethers.Contract(
+        tokenAddress,
+        [
+          'function balanceOf(address owner) view returns (uint256)',
+          'function decimals() view returns (uint8)',
+        ],
+        provider
+      );
+      
+      const balance = await tokenContract.balanceOf(ownerAddress);
+      const tokenDecimals = decimals || await tokenContract.decimals();
+      
+      return ethers.utils.formatUnits(balance, tokenDecimals);
+    } catch (error) {
+      console.error('Error getting token balance:', error);
+      return '0.0';
     }
   }
 }

@@ -1,4 +1,3 @@
-
 import { v4 as uuidv4 } from 'uuid';
 import { toast } from '@/hooks/use-toast';
 import { blockchain } from '@/utils/blockchain';
@@ -19,7 +18,7 @@ export interface SystemAlert {
   id: string;
   timestamp: number;
   level: 'info' | 'warning' | 'error' | 'critical';
-  category: 'application' | 'blockchain' | 'trade' | 'system';
+  category: 'application' | 'blockchain' | 'trade' | 'system' | 'gas';
   message: string;
   source: string;
   metadata?: Record<string, any>;
