@@ -571,7 +571,8 @@ class AnalyticsService {
     this.systemHealth.lastChecked = Date.now();
     
     // Check blockchain connection
-    this.systemHealth.components.blockchain = blockchain.isWalletConnected() 
+    const isWalletConnected = blockchain.isWalletConnected();
+    this.systemHealth.components.blockchain = isWalletConnected 
       ? 'connected' 
       : 'disconnected';
     
