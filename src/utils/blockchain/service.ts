@@ -1,172 +1,339 @@
 
-import { ethers, BigNumber } from 'ethers';
-import { WalletType } from '@/types';
-import { getNetworkName } from '@/utils/wallet';
-import { toast } from '@/hooks/use-toast';
-import { NETWORKS } from './networks';
-import { RetryConfig, DEFAULT_RETRY_CONFIG, EnhancedTransactionReceipt, GasPriceStrategy } from './types';
+import { ethers } from 'ethers';
+import { networks } from './networks';
+import { logger } from '@/utils/monitoring/loggingService';
+import { analyticsService } from '@/utils/monitoring/analyticsService';
 
-// Network providers cache
-const providers: Record<number, ethers.providers.Provider> = {};
+// Types for the blockchain service
+export type NetworkConfig = {
+  name: string;
+  chainId: number;
+  rpcUrl: string;
+  explorer: string;
+  currencySymbol: string;
+};
 
-// Blockchain service class
+// Blockchain service for managing connections and interactions
 class BlockchainService {
-  private currentWalletType: WalletType = null;
-  private currentSigner: ethers.Signer | null = null;
-  private currentProvider: ethers.providers.Provider | null = null;
-  private currentChainId: number = 1; // Default to Ethereum Mainnet
-
-  // Get provider for a specific chain
-  public getProvider(chainId: number): ethers.providers.Provider {
-    if (!providers[chainId]) {
-      const network = this.getNetworkConfig(chainId);
-      providers[chainId] = new ethers.providers.JsonRpcProvider(network.rpcUrl);
-    }
-    return providers[chainId];
+  private provider?: ethers.providers.Web3Provider;
+  private networks: Record<number, NetworkConfig>;
+  private signer?: ethers.Signer;
+  private walletAddress?: string;
+  private balance?: string;
+  private currentChainId?: number;
+  private connectionListeners: Array<(connected: boolean) => void> = [];
+  
+  constructor() {
+    // Initialize with supported networks
+    this.networks = networks;
+    
+    // Check if window.ethereum exists
+    this.setupProvider();
+    
+    // Log the service initialization
+    logger.info('blockchain', 'Blockchain service initialized');
   }
-
-  // Get current provider
-  public getCurrentProvider(): ethers.providers.Provider {
-    if (!this.currentProvider) {
-      this.currentProvider = this.getProvider(this.currentChainId);
+  
+  private setupProvider() {
+    if (typeof window !== 'undefined' && window.ethereum) {
+      this.provider = new ethers.providers.Web3Provider(window.ethereum, 'any');
+      
+      // Listen for account changes
+      window.ethereum.on('accountsChanged', this.handleAccountsChanged.bind(this));
+      
+      // Listen for chain changes
+      window.ethereum.on('chainChanged', this.handleChainChanged.bind(this));
+    } else {
+      console.warn('No ethereum provider found in window');
+      logger.warn('blockchain', 'No ethereum provider found in window');
     }
-    return this.currentProvider;
   }
-
-  // Get network configuration by chain ID
-  public getNetworkConfig(chainId: number) {
-    const network = Object.values(NETWORKS).find(net => net.id === chainId);
-    if (!network) {
-      throw new Error(`Unsupported network with chain ID: ${chainId}`);
+  
+  private handleAccountsChanged(accounts: string[]) {
+    if (accounts.length === 0) {
+      this.walletAddress = undefined;
+      this.signer = undefined;
+      this.balance = undefined;
+      
+      this.notifyConnectionListeners(false);
+      logger.info('blockchain', 'Wallet disconnected', { reason: 'accountsChanged' });
+      
+      analyticsService.recordMetric({
+        category: 'blockchain',
+        name: 'wallet_connected',
+        value: 0
+      });
+    } else if (accounts[0] !== this.walletAddress) {
+      this.walletAddress = accounts[0];
+      this.setupSigner();
+      this.updateBalance();
+      
+      this.notifyConnectionListeners(true);
+      logger.info('blockchain', 'Wallet account changed', { newAddress: accounts[0] });
+      
+      analyticsService.recordMetric({
+        category: 'blockchain',
+        name: 'wallet_connected',
+        value: 1
+      });
     }
-    return network;
   }
-
-  // Set the wallet type and initialize a provider
-  public async setWalletType(type: WalletType, chainId: number): Promise<void> {
-    this.currentWalletType = type;
+  
+  private handleChainChanged(chainIdHex: string) {
+    // Parse chain ID from hex to decimal
+    const chainId = parseInt(chainIdHex, 16);
     this.currentChainId = chainId;
     
-    // This is a simplified implementation. In a real application, you would:
-    // 1. Initialize the appropriate provider based on wallet type (MetaMask, WalletConnect, etc.)
-    // 2. Get a signer from that provider
+    logger.info('blockchain', 'Chain changed', { chainId });
     
-    // For simulation purposes:
-    this.currentProvider = this.getProvider(chainId);
+    // Reset provider and signer
+    this.setupProvider();
+    this.setupSigner();
     
-    // For real wallet integration (example with window.ethereum):
-    // if (type === 'metamask' && window.ethereum) {
-    //   const provider = new ethers.providers.Web3Provider(window.ethereum);
-    //   this.currentProvider = provider;
-    //   this.currentSigner = provider.getSigner();
-    // }
+    analyticsService.recordMetric({
+      category: 'blockchain',
+      name: 'chain_changed',
+      value: 1,
+      metadata: { chainId }
+    });
   }
-
-  // Get the current signer
-  public getSigner(): ethers.Signer | null {
-    return this.currentSigner;
+  
+  private setupSigner() {
+    if (this.provider) {
+      this.signer = this.provider.getSigner();
+    }
   }
-
-  // Check if wallet is connected
-  public isWalletConnected(): boolean {
-    return this.currentSigner !== null;
-  }
-
-  // Get account balance
-  public async getBalance(address: string): Promise<string> {
-    const provider = this.getCurrentProvider();
-    const balance = await provider.getBalance(address);
-    const networkConfig = this.getNetworkConfig(this.currentChainId);
-    return ethers.utils.formatUnits(balance, networkConfig.nativeCurrency.decimals);
-  }
-
-  // Get token balance
-  public async getTokenBalance(
-    tokenAddress: string,
-    walletAddress: string,
-    decimals: number = 18
-  ): Promise<string> {
-    const provider = this.getCurrentProvider();
-    
-    // ERC20 standard ABI for balanceOf
-    const abi = [
-      'function balanceOf(address owner) view returns (uint256)',
-      'function decimals() view returns (uint8)',
-    ];
-    
-    const tokenContract = new ethers.Contract(tokenAddress, abi, provider);
-    
+  
+  // Connect wallet
+  async connectWallet(): Promise<string | undefined> {
     try {
-      // Try to get decimals from the contract
-      try {
-        decimals = await tokenContract.decimals();
-      } catch (error) {
-        console.warn('Could not get token decimals, using default:', decimals);
+      if (!this.provider) {
+        this.setupProvider();
       }
       
-      const balance = await tokenContract.balanceOf(walletAddress);
-      return ethers.utils.formatUnits(balance, decimals);
+      if (!this.provider) {
+        logger.error('blockchain', 'Failed to connect wallet: No provider available');
+        throw new Error('No Ethereum provider found');
+      }
+      
+      const accounts = await this.provider.send('eth_requestAccounts', []);
+      this.walletAddress = accounts[0];
+      this.setupSigner();
+      await this.updateBalance();
+      
+      // Get current chain ID
+      const network = await this.provider.getNetwork();
+      this.currentChainId = network.chainId;
+      
+      this.notifyConnectionListeners(true);
+      logger.info('blockchain', 'Wallet connected', { address: this.walletAddress });
+      
+      analyticsService.recordMetric({
+        category: 'blockchain',
+        name: 'wallet_connected',
+        value: 1,
+        metadata: { address: this.walletAddress }
+      });
+      
+      return this.walletAddress;
     } catch (error) {
-      console.error('Error getting token balance:', error);
+      logger.error('blockchain', 'Failed to connect wallet', { error });
+      console.error('Error connecting wallet:', error);
+      this.notifyConnectionListeners(false);
       throw error;
     }
   }
-
-  // Check token allowance
-  public async getTokenAllowance(
-    tokenAddress: string,
-    ownerAddress: string,
-    spenderAddress: string,
-    decimals: number = 18
-  ): Promise<string> {
-    const provider = this.getCurrentProvider();
+  
+  // Disconnect wallet
+  disconnectWallet(): void {
+    this.walletAddress = undefined;
+    this.signer = undefined;
+    this.balance = undefined;
     
-    // ERC20 standard ABI for allowance
-    const abi = ['function allowance(address owner, address spender) view returns (uint256)'];
+    this.notifyConnectionListeners(false);
+    logger.info('blockchain', 'Wallet disconnected', { reason: 'manual' });
     
-    const tokenContract = new ethers.Contract(tokenAddress, abi, provider);
-    
-    const allowance = await tokenContract.allowance(ownerAddress, spenderAddress);
-    return ethers.utils.formatUnits(allowance, decimals);
+    analyticsService.recordMetric({
+      category: 'blockchain',
+      name: 'wallet_connected',
+      value: 0
+    });
   }
-
-  // Retry a transaction with exponential backoff
-  private async withRetry<T>(
-    fn: () => Promise<T>,
-    config: RetryConfig
-  ): Promise<T> {
-    let lastError: Error | null = null;
-    let delay = config.initialDelayMs;
-    
-    for (let attempt = 1; attempt <= config.maxAttempts; attempt++) {
+  
+  // Update wallet balance
+  async updateBalance(): Promise<string | undefined> {
+    try {
+      if (!this.provider || !this.walletAddress) {
+        return undefined;
+      }
+      
+      const balance = await this.provider.getBalance(this.walletAddress);
+      this.balance = ethers.utils.formatEther(balance);
+      
+      analyticsService.recordMetric({
+        category: 'blockchain',
+        name: 'wallet_balance',
+        value: parseFloat(this.balance),
+        unit: 'ETH'
+      });
+      
+      logger.debug('blockchain', 'Wallet balance updated', { balance: this.balance });
+      
+      return this.balance;
+    } catch (error) {
+      logger.error('blockchain', 'Failed to update balance', { error });
+      console.error('Error updating balance:', error);
+      return undefined;
+    }
+  }
+  
+  // Get current provider
+  getCurrentProvider(): ethers.providers.Provider {
+    if (!this.provider) {
+      // Fallback to JsonRpcProvider with mainnet
+      logger.warn('blockchain', 'Using fallback JSON-RPC provider');
+      return new ethers.providers.JsonRpcProvider(this.networks[1].rpcUrl);
+    }
+    return this.provider;
+  }
+  
+  // Get signer
+  getSigner(): ethers.Signer | undefined {
+    return this.signer;
+  }
+  
+  // Check if wallet is connected
+  isWalletConnected(): boolean {
+    return !!this.walletAddress && !!this.signer;
+  }
+  
+  // Get wallet address
+  getWalletAddress(): string | undefined {
+    return this.walletAddress;
+  }
+  
+  // Get wallet balance
+  getWalletBalance(): string | undefined {
+    return this.balance;
+  }
+  
+  // Get current chain ID
+  getCurrentChainId(): number | undefined {
+    return this.currentChainId;
+  }
+  
+  // Get network config for chain ID
+  getNetworkConfig(chainId: number): NetworkConfig {
+    return this.networks[chainId] || this.networks[1]; // Fallback to mainnet
+  }
+  
+  // Add connection listener
+  addConnectionListener(listener: (connected: boolean) => void): void {
+    this.connectionListeners.push(listener);
+  }
+  
+  // Remove connection listener
+  removeConnectionListener(listener: (connected: boolean) => void): void {
+    this.connectionListeners = this.connectionListeners.filter(l => l !== listener);
+  }
+  
+  // Notify all connection listeners
+  private notifyConnectionListeners(connected: boolean): void {
+    this.connectionListeners.forEach(listener => {
       try {
-        return await fn();
-      } catch (error: any) {
-        console.warn(`Attempt ${attempt} failed:`, error);
-        lastError = error;
+        listener(connected);
+      } catch (error) {
+        console.error('Error in connection listener:', error);
+      }
+    });
+  }
+  
+  // Switch network
+  async switchNetwork(chainId: number): Promise<boolean> {
+    try {
+      if (!this.provider || !window.ethereum) {
+        logger.error('blockchain', 'Cannot switch network: No provider');
+        return false;
+      }
+      
+      const network = this.networks[chainId];
+      if (!network) {
+        logger.error('blockchain', 'Cannot switch network: Unsupported chain ID', { chainId });
+        return false;
+      }
+      
+      const chainIdHex = '0x' + chainId.toString(16);
+      
+      try {
+        await window.ethereum.request({
+          method: 'wallet_switchEthereumChain',
+          params: [{ chainId: chainIdHex }],
+        });
         
-        if (attempt < config.maxAttempts) {
-          // Wait before retrying with exponential backoff
-          await new Promise(resolve => setTimeout(resolve, delay));
-          delay = delay * config.backoffFactor;
-          
-          // Adjust gas price for certain errors
-          if (
-            error.code === 'REPLACEMENT_UNDERPRICED' ||
-            error.message?.includes('transaction underpriced')
-          ) {
-            // Increase gas price for next attempt
-            // This logic would be specific to your implementation
-            console.log('Increasing gas price for next attempt');
+        this.currentChainId = chainId;
+        logger.info('blockchain', 'Switched network', { chainId, network: network.name });
+        
+        analyticsService.recordMetric({
+          category: 'blockchain',
+          name: 'network_switched',
+          value: chainId,
+          metadata: { networkName: network.name }
+        });
+        
+        return true;
+      } catch (switchError: any) {
+        // This error code indicates that the chain has not been added to MetaMask.
+        if (switchError.code === 4902) {
+          try {
+            await window.ethereum.request({
+              method: 'wallet_addEthereumChain',
+              params: [
+                {
+                  chainId: chainIdHex,
+                  chainName: network.name,
+                  nativeCurrency: {
+                    name: network.currencySymbol,
+                    symbol: network.currencySymbol,
+                    decimals: 18,
+                  },
+                  rpcUrls: [network.rpcUrl],
+                  blockExplorerUrls: [network.explorer],
+                },
+              ],
+            });
+            
+            this.currentChainId = chainId;
+            logger.info('blockchain', 'Added and switched network', { 
+              chainId, 
+              network: network.name 
+            });
+            
+            analyticsService.recordMetric({
+              category: 'blockchain',
+              name: 'network_added',
+              value: chainId,
+              metadata: { networkName: network.name }
+            });
+            
+            return true;
+          } catch (addError) {
+            logger.error('blockchain', 'Failed to add network', { error: addError });
+            console.error('Error adding chain:', addError);
+            return false;
           }
         }
+        
+        logger.error('blockchain', 'Failed to switch network', { error: switchError });
+        console.error('Error switching chain:', switchError);
+        return false;
       }
+    } catch (error) {
+      logger.error('blockchain', 'Error in switchNetwork', { error });
+      console.error('Error:', error);
+      return false;
     }
-    
-    // If we've exhausted all attempts, throw the last error
-    throw lastError || new Error('Transaction failed after retries');
   }
 }
 
-// Export singleton instance
+// Create and export a singleton instance
 export const blockchain = new BlockchainService();
