@@ -583,7 +583,7 @@ class AnalyticsService {
     // Update overall system health status
     if (criticalAlerts.length > 0) {
       this.systemHealth.status = 'critical';
-    } else if (errorAlerts.length > 0 || this.systemHealth.components.blockchain === 'error') {
+    } else if (errorAlerts.length > 0 || this.systemHealth.components.blockchain === 'disconnected') {
       this.systemHealth.status = 'degraded';
     } else {
       this.systemHealth.status = 'healthy';

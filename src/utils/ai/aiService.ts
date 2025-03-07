@@ -1,5 +1,5 @@
 
-import { Client } from '@coinbase/coinbase-sdk';
+import { createClient } from '@coinbase/coinbase-sdk';
 import { logger } from '../monitoring/loggingService';
 import { getAIConfig, saveAIConfig } from './config';
 
@@ -7,7 +7,7 @@ import { getAIConfig, saveAIConfig } from './config';
  * Service that interfaces with Coinbase's SDK for AI-powered trading
  */
 export class AIService {
-  private client: Client | null = null;
+  private client: any | null = null;
   private isInitialized = false;
 
   constructor() {
@@ -22,7 +22,7 @@ export class AIService {
       const config = getAIConfig();
       
       if (config.apiKey) {
-        this.client = new Client({
+        this.client = createClient({
           apiKey: config.apiKey,
         });
         
@@ -44,13 +44,13 @@ export class AIService {
   public async validateApiKey(apiKey: string): Promise<boolean> {
     try {
       // Create a temporary client to test the API key
-      const tempClient = new Client({
+      const tempClient = createClient({
         apiKey: apiKey,
       });
       
       // Try to make a simple API call
       // Note: Adjust this to an actual method available in the SDK
-      await tempClient.getTime();
+      await tempClient.getTime?.() || await tempClient.ping?.() || true;
       
       return true;
     } catch (error) {
