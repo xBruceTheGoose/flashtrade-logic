@@ -1,11 +1,10 @@
-
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tabs, TabsContent, TabsItem, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { useNavigate } from "react-router-dom";
-import { ArbitragePanel } from "@/components/ArbitragePanel";
-import { PriceMonitoringPanel } from "@/components/PriceMonitoringPanel";
+import ArbitragePanel from "@/components/ArbitragePanel";
+import PriceMonitoringPanel from "@/components/PriceMonitoringPanel";
 import { Activity, AlertTriangle, BookText, ChevronRight, Cpu, LayoutDashboard, LineChart, Settings, Zap } from "lucide-react";
 import SystemStatus from "@/components/system/SystemStatus";
 import Documentation from "@/components/system/Documentation";
@@ -87,7 +86,7 @@ const Index = () => {
               </div>
               
               {!isWalletConnected && (
-                <Alert variant="warning" className="bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-900 dark:text-yellow-400">
+                <Alert variant="destructive" className="bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-900 dark:text-yellow-400">
                   <AlertTriangle className="h-4 w-4" />
                   <AlertTitle>Connect Wallet</AlertTitle>
                   <AlertDescription>

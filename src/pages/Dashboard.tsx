@@ -2,12 +2,12 @@
 import React from 'react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArbitrageOpportunitiesPanel } from '@/components/dashboard/ArbitrageOpportunitiesPanel';
-import { PerformancePanel } from '@/components/dashboard/PerformancePanel';
-import { TradingHistoryPanel } from '@/components/dashboard/TradingHistoryPanel';
-import { WalletPanel } from '@/components/dashboard/WalletPanel';
-import { StrategyRecommendationsPanel } from '@/components/dashboard/StrategyRecommendationsPanel';
-import { AIStrategyDashboard } from '@/components/dashboard/AIStrategyDashboard';
+import ArbitrageOpportunitiesPanel from '@/components/dashboard/ArbitrageOpportunitiesPanel';
+import PerformancePanel from '@/components/dashboard/PerformancePanel';
+import TradingHistoryPanel from '@/components/dashboard/TradingHistoryPanel';
+import WalletPanel from '@/components/dashboard/WalletPanel';
+import StrategyRecommendationsPanel from '@/components/dashboard/StrategyRecommendationsPanel';
+import AIStrategyDashboard from '@/components/dashboard/AIStrategyDashboard';
 import { Activity, AlertOctagon, Cpu, LineChart, History } from 'lucide-react';
 import SystemStatus from '@/components/system/SystemStatus';
 import { useWallet } from '@/hooks/useWallet';
