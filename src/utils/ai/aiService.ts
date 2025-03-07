@@ -135,6 +135,129 @@ export class AIService {
       };
     }
   }
+  
+  /**
+   * Generate trading strategy recommendations using AI
+   */
+  public async generateStrategyRecommendations(analysisData: any): Promise<{
+    parameters: any;
+    confidence: number;
+    reasoning: string;
+  }> {
+    if (!this.isInitialized || !this.client) {
+      logger.warn('ai', 'Cannot generate strategy - AI service not initialized');
+      return {
+        parameters: {},
+        confidence: 0,
+        reasoning: 'AI service not initialized',
+      };
+    }
+
+    try {
+      logger.info('ai', 'Generating AI strategy recommendations', { analysisData });
+      
+      // This is a placeholder for actual SDK implementation
+      // In a real implementation, this would call a machine learning model
+      
+      // Extract key indicators from analysis data
+      const volatility = analysisData.marketConditions?.volatility?.eth || 0;
+      const congestion = analysisData.marketConditions?.gas?.congestion || 'medium';
+      const successRate = analysisData.performanceData?.successRate || 0;
+      
+      // Simulate AI-based parameter recommendations
+      const parameters: any = {};
+      
+      // Adjust parameters based on market conditions
+      if (congestion === 'high') {
+        parameters.gasPrice = 'aggressive';
+        parameters.slippageTolerance = Math.min(2.0, analysisData.currentConfig?.slippageTolerance * 1.2 || 1.0);
+      } else if (congestion === 'low') {
+        parameters.gasPrice = 'standard';
+      }
+      
+      if (volatility > 10) {
+        parameters.maxTradeSize = Math.min(0.5, analysisData.currentConfig?.maxTradeSize || 1.0);
+        parameters.minProfitPercentage = Math.max(0.8, analysisData.currentConfig?.minProfitPercentage || 0.5);
+      }
+      
+      // Calculate confidence based on data quality
+      const confidence = Math.min(
+        0.5 + (analysisData.performanceData?.totalTrades || 0) / 100,
+        0.95
+      );
+      
+      return {
+        parameters,
+        confidence,
+        reasoning: `Recommendations based on market volatility (${volatility.toFixed(2)}%), network congestion (${congestion}), and historical success rate (${successRate.toFixed(2)}%)`,
+      };
+    } catch (error) {
+      logger.error('ai', 'Failed to generate strategy recommendations', { error });
+      return {
+        parameters: {},
+        confidence: 0,
+        reasoning: 'Error during strategy generation',
+      };
+    }
+  }
+  
+  /**
+   * Predict slippage for a given trade using machine learning
+   */
+  public async predictSlippage(tradeData: any): Promise<{
+    estimatedSlippage: number;
+    confidence: number;
+  }> {
+    if (!this.isInitialized || !this.client) {
+      logger.warn('ai', 'Cannot predict slippage - AI service not initialized');
+      return {
+        estimatedSlippage: 0.5, // Default slippage
+        confidence: 0,
+      };
+    }
+
+    try {
+      // Extract relevant features for prediction
+      const { tokenPair, dex, tradeSize, marketVolatility } = tradeData;
+      
+      // This is a placeholder for an actual ML-based prediction
+      // In a real implementation, this would use a trained model
+      
+      // Simple heuristic-based prediction
+      let baseSlippage = 0.1; // Base slippage of 0.1%
+      
+      // Adjust based on trade size (larger trades = more slippage)
+      if (tradeSize > 1.0) {
+        baseSlippage += (tradeSize - 1.0) * 0.2; // Add 0.2% for each ETH above 1
+      }
+      
+      // Adjust based on market volatility
+      if (marketVolatility) {
+        baseSlippage += marketVolatility * 0.05; // Add 0.05% for each volatility percentage point
+      }
+      
+      // Determine confidence based on data quality
+      const confidence = 0.7; // Fixed confidence for now
+      
+      return {
+        estimatedSlippage: Math.min(baseSlippage, 5.0), // Cap at 5%
+        confidence,
+      };
+    } catch (error) {
+      logger.error('ai', 'Failed to predict slippage', { error, tradeData });
+      return {
+        estimatedSlippage: 0.5, // Default slippage
+        confidence: 0,
+      };
+    }
+  }
+  
+  /**
+   * Check if the AI service is initialized
+   */
+  public isInitializedAndReady(): boolean {
+    return this.isInitialized && this.client !== null;
+  }
 }
 
 export const aiService = new AIService();
