@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ArbitrageOpportunitiesPanel from '@/components/dashboard/ArbitrageOpportunitiesPanel';
@@ -11,10 +11,14 @@ import AIStrategyDashboard from '@/components/dashboard/AIStrategyDashboard';
 import { Activity, AlertOctagon, Cpu, LineChart, History } from 'lucide-react';
 import SystemStatus from '@/components/system/SystemStatus';
 import { useWallet } from '@/hooks/useWallet';
+import { TradeExecutionRecord } from '@/utils/arbitrage/types';
 
 const Dashboard = () => {
   const { wallet } = useWallet();
   const isConnected = wallet?.connected || false;
+  
+  // Initialize empty trades array - in a real app, this would come from your trade history service
+  const [trades] = useState<TradeExecutionRecord[]>([]);
 
   return (
     <div className="container mx-auto p-4 pb-16 space-y-6">
@@ -62,11 +66,11 @@ const Dashboard = () => {
             </TabsContent>
 
             <TabsContent value="history" className="space-y-4">
-              <TradingHistoryPanel />
+              <TradingHistoryPanel trades={trades} />
             </TabsContent>
 
             <TabsContent value="performance" className="space-y-4">
-              <PerformancePanel />
+              <PerformancePanel trades={trades} />
             </TabsContent>
 
             <TabsContent value="ai" className="space-y-4">

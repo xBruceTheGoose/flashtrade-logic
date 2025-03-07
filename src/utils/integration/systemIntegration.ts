@@ -3,14 +3,34 @@ import { appState, AppState } from './stateManagement';
 import { ErrorHandler, ErrorSeverity } from './errorHandling';
 import { logger } from '../monitoring/loggingService';
 
+interface SystemStatus {
+  moduleStatuses: {
+    ai: boolean;
+    blockchain: boolean;
+    priceMonitoring: boolean;
+    tradeExecution: boolean;
+    smartContracts: boolean;
+  };
+}
+
 export class SystemIntegration {
   private blockchainService: BlockchainService;
+  private status: SystemStatus;
   
   constructor(blockchainService: BlockchainService) {
     this.blockchainService = blockchainService;
+    this.status = {
+      moduleStatuses: {
+        ai: false,
+        blockchain: false,
+        priceMonitoring: false,
+        tradeExecution: false,
+        smartContracts: false,
+      }
+    };
   }
   
-  async initialize(): Promise<void> {
+  async initialize(): Promise<boolean> {
     try {
       appState.setState(AppState.INITIALIZING);
       
@@ -21,9 +41,13 @@ export class SystemIntegration {
         throw new Error('Blockchain connectivity failed');
       }
       
+      // Update blockchain status
+      this.status.moduleStatuses.blockchain = true;
+      
       // Transition to ready state
       appState.setState(AppState.READY);
       logger.info('system', 'System initialization completed');
+      return true;
     } catch (error) {
       ErrorHandler.handleError(
         error as Error,
@@ -31,6 +55,7 @@ export class SystemIntegration {
         ErrorSeverity.CRITICAL
       );
       appState.setState(AppState.ERROR);
+      return false;
     }
   }
   
@@ -59,6 +84,19 @@ export class SystemIntegration {
       );
       return false;
     }
+  }
+
+  getSystemStatus(): SystemStatus {
+    return this.status;
+  }
+
+  canExecuteTrades(): boolean {
+    return this.status.moduleStatuses.blockchain && 
+           this.status.moduleStatuses.tradeExecution;
+  }
+
+  isAIAssistanceAvailable(): boolean {
+    return this.status.moduleStatuses.ai;
   }
 }
 
