@@ -6,16 +6,18 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { CheckCircle, AlertCircle, AlertTriangle, Activity, Zap } from 'lucide-react';
+import { CheckCircle, AlertCircle, AlertTriangle, Activity, Zap, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 const SystemStatus = () => {
   const [status, setStatus] = useState(systemIntegration.getSystemStatus());
   const [appCurrentState, setAppCurrentState] = useState(appState.getState());
   const [initialized, setInitialized] = useState(false);
+  const [initializing, setInitializing] = useState(false);
   
-  useEffect(() => {
-    // Initialize system on component mount
-    const initSystem = async () => {
+  const initSystem = async () => {
+    setInitializing(true);
+    try {
       const success = await systemIntegration.initialize();
       setStatus(systemIntegration.getSystemStatus());
       setInitialized(true);
@@ -23,11 +25,21 @@ const SystemStatus = () => {
       // Update app state based on initialization result
       if (success) {
         appState.setState(AppState.READY);
+      } else if (status.moduleStatuses.ai) {
+        // If AI is available but blockchain failed, we can still operate in limited mode
+        appState.setState(AppState.PAUSED);
       } else {
         appState.setState(AppState.ERROR);
       }
-    };
-    
+    } catch (error) {
+      console.error("Error initializing system:", error);
+    } finally {
+      setInitializing(false);
+    }
+  };
+  
+  useEffect(() => {
+    // Initialize system on component mount
     initSystem();
     
     // Listen for app state changes
@@ -39,6 +51,11 @@ const SystemStatus = () => {
       unsubscribe();
     };
   }, []);
+  
+  // Update status when app state changes
+  useEffect(() => {
+    setStatus(systemIntegration.getSystemStatus());
+  }, [appCurrentState]);
   
   const getStatusColor = (isActive: boolean) => {
     return isActive ? 'text-green-500' : 'text-red-500';
@@ -99,6 +116,10 @@ const SystemStatus = () => {
   
   const stateDetails = getAppStateDetails();
   
+  const handleRetry = () => {
+    initSystem();
+  };
+  
   return (
     <Card className="shadow-md">
       <CardHeader className="pb-2">
@@ -108,7 +129,7 @@ const SystemStatus = () => {
         </CardTitle>
       </CardHeader>
       <CardContent>
-        {!initialized ? (
+        {initializing ? (
           <div className="space-y-2">
             <div className="text-sm text-slate-500">Initializing system...</div>
             <Progress value={33} className="h-2" />
@@ -164,7 +185,52 @@ const SystemStatus = () => {
                 <AlertTitle>System Error</AlertTitle>
                 <AlertDescription>
                   One or more system components failed to initialize properly.
-                  Check logs for more details or try refreshing the page.
+                  {status.errors.blockchain && (
+                    <div className="mt-2 text-sm">
+                      <strong>Blockchain Error:</strong> {status.errors.blockchain}
+                    </div>
+                  )}
+                  {status.errors.general && (
+                    <div className="mt-2 text-sm">
+                      <strong>Error:</strong> {status.errors.general}
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handleRetry} 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Retry Connection
+                  </Button>
+                </AlertDescription>
+              </Alert>
+            )}
+            
+            {appCurrentState === AppState.PAUSED && (
+              <Alert className="mt-4 bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-900 dark:text-yellow-400">
+                <AlertTriangle className="h-4 w-4" />
+                <AlertTitle>Limited Functionality</AlertTitle>
+                <AlertDescription>
+                  Some system components are unavailable. 
+                  {status.errors.blockchain && (
+                    <div className="mt-2 text-sm">
+                      Blockchain connectivity issue: {status.errors.blockchain}
+                    </div>
+                  )}
+                  {systemIntegration.isAIAssistanceAvailable() && (
+                    <div className="mt-2 text-sm">
+                      AI assistance is still available.
+                    </div>
+                  )}
+                  <Button 
+                    onClick={handleRetry} 
+                    variant="outline" 
+                    size="sm" 
+                    className="mt-2"
+                  >
+                    <RefreshCw className="h-3 w-3 mr-1" /> Retry Connection
+                  </Button>
                 </AlertDescription>
               </Alert>
             )}
