@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import GlassCard from '@/components/ui/GlassCard';
 import { useWallet } from '@/hooks/useWallet';
 import { Button } from '@/components/ui/button';
@@ -14,7 +14,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Save } from 'lucide-react';
+import { Save, Check, X, AlertTriangle } from 'lucide-react';
+import { aiService } from '@/utils/ai/aiService';
+import { getAIConfig } from '@/utils/ai/config';
 
 const Settings = () => {
   const { wallet } = useWallet();
@@ -24,13 +26,76 @@ const Settings = () => {
   const [network, setNetwork] = useState('ethereum');
   const [minProfit, setMinProfit] = useState('0.1');
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [apiKey, setApiKey] = useState('');
+  const [apiKeyStatus, setApiKeyStatus] = useState<'idle' | 'validating' | 'valid' | 'invalid'>('idle');
+  const [isApiKeyChanged, setIsApiKeyChanged] = useState(false);
+  
+  // Load saved API key on mount
+  useEffect(() => {
+    const config = getAIConfig();
+    if (config.apiKey) {
+      setApiKey(config.apiKey);
+    }
+  }, []);
+  
+  const validateApiKey = async () => {
+    if (!apiKey) {
+      setApiKeyStatus('invalid');
+      return;
+    }
+    
+    setApiKeyStatus('validating');
+    const isValid = await aiService.validateApiKey(apiKey);
+    
+    if (isValid) {
+      setApiKeyStatus('valid');
+      aiService.setApiKey(apiKey);
+      setIsApiKeyChanged(false);
+      
+      toast({
+        title: 'API Key Validated',
+        description: 'Your Coinbase API key is valid and has been saved.',
+      });
+    } else {
+      setApiKeyStatus('invalid');
+      toast({
+        title: 'Invalid API Key',
+        description: 'The provided API key could not be validated.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  const handleApiKeyChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setApiKey(e.target.value);
+    setApiKeyStatus('idle');
+    setIsApiKeyChanged(true);
+  };
   
   const saveSettings = () => {
+    // Validate API key if it has changed
+    if (isApiKeyChanged && apiKey) {
+      validateApiKey();
+    }
+    
     // In a real app, this would save to a backend or local storage
     toast({
       title: 'Settings Saved',
       description: 'Your changes have been saved successfully.',
     });
+  };
+  
+  const getApiKeyStatusIcon = () => {
+    switch (apiKeyStatus) {
+      case 'valid':
+        return <Check className="h-5 w-5 text-green-500" />;
+      case 'invalid':
+        return <X className="h-5 w-5 text-red-500" />;
+      case 'validating':
+        return <div className="h-5 w-5 animate-spin rounded-full border-2 border-current border-t-transparent" />;
+      default:
+        return null;
+    }
   };
   
   return (
@@ -143,18 +208,41 @@ const Settings = () => {
             </div>
             
             <div className="pt-6 mt-6 border-t">
-              <h3 className="text-lg font-medium mb-4">Advanced Settings</h3>
+              <h3 className="text-lg font-medium mb-4">Coinbase AI Framework</h3>
               
-              <div className="space-y-2">
-                <Label htmlFor="api-key">AI Framework API Key</Label>
-                <Input
-                  id="api-key"
-                  type="password"
-                  placeholder="Enter API key"
-                  disabled={!wallet?.connected}
-                />
+              <div className="space-y-2 mb-4">
+                <div className="flex items-center justify-between">
+                  <Label htmlFor="api-key">API Key</Label>
+                  <div className="flex items-center">
+                    {isApiKeyChanged && (
+                      <span className="text-xs text-amber-500 flex items-center mr-2">
+                        <AlertTriangle className="h-3 w-3 mr-1" />
+                        Unsaved changes
+                      </span>
+                    )}
+                    {getApiKeyStatusIcon()}
+                  </div>
+                </div>
+                <div className="flex gap-2">
+                  <Input
+                    id="api-key"
+                    type="password"
+                    placeholder="Enter your Coinbase API key"
+                    value={apiKey}
+                    onChange={handleApiKeyChange}
+                    className="flex-grow"
+                    disabled={!wallet?.connected}
+                  />
+                  <Button 
+                    onClick={validateApiKey} 
+                    disabled={!wallet?.connected || !apiKey || apiKeyStatus === 'validating'}
+                    variant="outline"
+                  >
+                    Validate
+                  </Button>
+                </div>
                 <p className="text-xs text-muted-foreground">
-                  API key for Coinbase's agentic onchain AI development framework
+                  API key for Coinbase's AI trading framework (ID: 2353bcc1-8f9a-44cb-923d-3acc8a661d9b)
                 </p>
               </div>
             </div>
