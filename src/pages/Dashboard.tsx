@@ -1,157 +1,108 @@
 
-import { useEffect, useState } from 'react';
-import { useWallet } from '@/hooks/useWallet';
-import GlassCard from '@/components/ui/GlassCard';
-import { Progress } from '@/components/ui/progress';
+import React from 'react';
+import { Card, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { toast } from '@/hooks/use-toast';
-import { ArrowUpRight, Wallet, RefreshCw, Eye, Clock, BarChart3, Zap, Settings } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import WalletPanel from '@/components/dashboard/WalletPanel';
-import ArbitrageOpportunitiesPanel from '@/components/dashboard/ArbitrageOpportunitiesPanel';
-import TradingHistoryPanel from '@/components/dashboard/TradingHistoryPanel';
-import TradeConfigPanel from '@/components/dashboard/TradeConfigPanel';
-import PerformancePanel from '@/components/dashboard/PerformancePanel';
-import { useMediaQuery } from '@/hooks/use-media-query';
-import DEXPanel from '@/components/DEXPanel';
-import { TradeExecutionRecord } from '@/utils/arbitrage/types';
-import { tradeExecutionStorage } from '@/utils/arbitrage/storage';
-import { Badge } from '@/components/ui/badge';
-import TradeConfigurationPanel from '@/components/trades/TradeConfigurationPanel';
+import { ArbitrageOpportunitiesPanel } from '@/components/dashboard/ArbitrageOpportunitiesPanel';
+import { PerformancePanel } from '@/components/dashboard/PerformancePanel';
+import { TradingHistoryPanel } from '@/components/dashboard/TradingHistoryPanel';
+import { WalletPanel } from '@/components/dashboard/WalletPanel';
+import { StrategyRecommendationsPanel } from '@/components/dashboard/StrategyRecommendationsPanel';
+import { AIStrategyDashboard } from '@/components/dashboard/AIStrategyDashboard';
+import { Activity, AlertOctagon, Cpu, LineChart, History } from 'lucide-react';
+import SystemStatus from '@/components/system/SystemStatus';
+import { useWallet } from '@/hooks/useWallet';
 
 const Dashboard = () => {
-  const { wallet, refreshBalance } = useWallet();
-  const [refreshing, setRefreshing] = useState(false);
-  const [tradeHistory, setTradeHistory] = useState<TradeExecutionRecord[]>([]);
-  const [activeOpportunities, setActiveOpportunities] = useState(0);
-  const isMobile = useMediaQuery("(max-width: 768px)");
-
-  useEffect(() => {
-    // Load trade history on component mount
-    const history = tradeExecutionStorage.getRecords();
-    setTradeHistory(history);
-
-    // Set up event listener for new trades
-    const handleNewTrade = () => {
-      setTradeHistory(tradeExecutionStorage.getRecords());
-      // Show notification for new trades
-      toast({
-        title: "Trade Executed",
-        description: "A new trade has been completed",
-      });
-    };
-
-    // Subscribe to trade updates
-    window.addEventListener('trade-executed', handleNewTrade);
-
-    return () => {
-      window.removeEventListener('trade-executed', handleNewTrade);
-    };
-  }, []);
-
-  const handleRefreshWallet = async () => {
-    if (!wallet?.connected) return;
-    
-    setRefreshing(true);
-    await refreshBalance();
-    setRefreshing(false);
-    
-    toast({
-      title: "Wallet Refreshed",
-      description: "Your wallet balance has been updated",
-    });
-  };
-
-  const updateActiveOpportunities = (count: number) => {
-    setActiveOpportunities(count);
-  };
+  const { wallet } = useWallet();
+  const isConnected = wallet?.connected || false;
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Trading Dashboard</h1>
-          <p className="text-muted-foreground mt-1">
-            Monitor opportunities, execute trades, and track performance
-          </p>
+    <div className="container mx-auto p-4 pb-16 space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="md:col-span-2">
+          <Card className="shadow-md">
+            <CardHeader>
+              <CardTitle className="text-2xl">Trading Dashboard</CardTitle>
+              <CardDescription>
+                Monitor performance and manage trading activities
+              </CardDescription>
+            </CardHeader>
+          </Card>
         </div>
-        
-        <div className="flex items-center gap-2">
-          {wallet?.connected ? (
-            <>
-              <Badge variant="outline" className="bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400">
-                Wallet Connected
-              </Badge>
-              <Button size="sm" variant="outline" onClick={handleRefreshWallet} disabled={refreshing}>
-                {refreshing ? (
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                ) : (
-                  <RefreshCw className="h-4 w-4" />
-                )}
-                <span className="sr-only md:not-sr-only md:ml-2">Refresh</span>
-              </Button>
-            </>
-          ) : (
-            <Badge variant="outline" className="bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400">
-              Wallet Not Connected
-            </Badge>
-          )}
+
+        <div className="md:col-span-1">
+          <SystemStatus />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="lg:col-span-3">
+          <Tabs defaultValue="opportunities" className="space-y-4">
+            <TabsList>
+              <TabsTrigger value="opportunities" className="flex items-center">
+                <Activity className="mr-1 h-4 w-4" />
+                Opportunities
+              </TabsTrigger>
+              <TabsTrigger value="history" className="flex items-center">
+                <History className="mr-1 h-4 w-4" />
+                History
+              </TabsTrigger>
+              <TabsTrigger value="performance" className="flex items-center">
+                <LineChart className="mr-1 h-4 w-4" />
+                Performance
+              </TabsTrigger>
+              <TabsTrigger value="ai" className="flex items-center">
+                <Cpu className="mr-1 h-4 w-4" />
+                AI Strategy
+              </TabsTrigger>
+            </TabsList>
+
+            <TabsContent value="opportunities" className="space-y-4">
+              <ArbitrageOpportunitiesPanel />
+            </TabsContent>
+
+            <TabsContent value="history" className="space-y-4">
+              <TradingHistoryPanel />
+            </TabsContent>
+
+            <TabsContent value="performance" className="space-y-4">
+              <PerformancePanel />
+            </TabsContent>
+
+            <TabsContent value="ai" className="space-y-4">
+              <AIStrategyDashboard />
+            </TabsContent>
+          </Tabs>
+        </div>
+
+        <div className="lg:col-span-1 space-y-6">
+          <WalletPanel />
           
-          {activeOpportunities > 0 && (
-            <Badge className="bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-400">
-              {activeOpportunities} Active Opportunities
-            </Badge>
-          )}
+          <Card className="shadow-md overflow-hidden">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-lg flex items-center">
+                <AlertOctagon className="mr-2 h-5 w-5" />
+                System Alerts
+              </CardTitle>
+            </CardHeader>
+            <div className="p-4">
+              {isConnected ? (
+                <ul className="space-y-2">
+                  <li className="text-sm py-2 px-3 bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-400 rounded-md">
+                    System operating normally
+                  </li>
+                </ul>
+              ) : (
+                <div className="text-sm py-2 px-3 bg-yellow-50 text-yellow-700 dark:bg-yellow-900/20 dark:text-yellow-400 rounded-md">
+                  Connect wallet to view alerts
+                </div>
+              )}
+            </div>
+          </Card>
+          
+          <StrategyRecommendationsPanel />
         </div>
       </div>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <WalletPanel className="lg:col-span-1" />
-        <ArbitrageOpportunitiesPanel 
-          className="lg:col-span-2" 
-          onOpportunitiesUpdate={updateActiveOpportunities}
-        />
-      </div>
-      
-      <Tabs defaultValue="advanced-config" className="w-full">
-        <TabsList className="w-full grid grid-cols-4 mb-4">
-          <TabsTrigger value="advanced-config">
-            <Settings className="h-4 w-4 mr-2" />
-            <span>Advanced Configuration</span>
-          </TabsTrigger>
-          <TabsTrigger value="basic-config">
-            <Eye className="h-4 w-4 mr-2" />
-            <span>Basic Configuration</span>
-          </TabsTrigger>
-          <TabsTrigger value="history">
-            <Clock className="h-4 w-4 mr-2" />
-            <span>Trading History</span>
-          </TabsTrigger>
-          <TabsTrigger value="performance">
-            <BarChart3 className="h-4 w-4 mr-2" />
-            <span>Performance</span>
-          </TabsTrigger>
-        </TabsList>
-        
-        <TabsContent value="advanced-config">
-          <TradeConfigurationPanel />
-        </TabsContent>
-        
-        <TabsContent value="basic-config">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <TradeConfigPanel />
-            <DEXPanel />
-          </div>
-        </TabsContent>
-        
-        <TabsContent value="history">
-          <TradingHistoryPanel trades={tradeHistory} />
-        </TabsContent>
-        
-        <TabsContent value="performance">
-          <PerformancePanel trades={tradeHistory} />
-        </TabsContent>
-      </Tabs>
     </div>
   );
 };

@@ -1,126 +1,145 @@
 
-import { useEffect, useRef } from 'react';
-import { Button } from '@/components/ui/button';
-import { Link } from 'react-router-dom';
-import { useWallet } from '@/hooks/useWallet';
-import GlassCard from '@/components/ui/GlassCard';
-import { ArrowRight, Zap, RefreshCcw, BarChart2 } from 'lucide-react';
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Tabs, TabsContent, TabsItem, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { useNavigate } from "react-router-dom";
+import { ArbitragePanel } from "@/components/ArbitragePanel";
+import { PriceMonitoringPanel } from "@/components/PriceMonitoringPanel";
+import { Activity, AlertTriangle, BookText, ChevronRight, Cpu, LayoutDashboard, LineChart, Settings, Zap } from "lucide-react";
+import SystemStatus from "@/components/system/SystemStatus";
+import Documentation from "@/components/system/Documentation";
+import { useWallet } from "@/hooks/useWallet";
 
 const Index = () => {
+  const navigate = useNavigate();
   const { wallet } = useWallet();
-  const heroRef = useRef<HTMLDivElement>(null);
-  
-  useEffect(() => {
-    const animateHero = () => {
-      if (heroRef.current) {
-        heroRef.current.classList.add('animate-fade-in');
-      }
-    };
-    
-    // Slight delay for animation
-    setTimeout(animateHero, 100);
-  }, []);
-  
+  const isWalletConnected = wallet?.connected || false;
+
   return (
-    <div className="space-y-20 py-10">
-      {/* Hero Section */}
-      <section 
-        ref={heroRef} 
-        className="relative text-center py-16 md:py-28 opacity-0 transition-opacity"
-      >
-        <div className="absolute inset-0 -z-10 bg-[linear-gradient(to_right,#d6dbf380_1px,transparent_1px),linear-gradient(to_bottom,#d6dbf380_1px,transparent_1px)] bg-[size:32px_32px]"></div>
+    <div className="container mx-auto p-4 pb-16 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2">
+          <Card className="shadow-md h-full">
+            <CardHeader>
+              <CardTitle className="text-2xl font-bold">
+                Crypto Arbitrage Trading Platform
+              </CardTitle>
+              <CardDescription>
+                Automated trading system with AI-powered strategy optimization
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <p className="text-muted-foreground">
+                Identify and execute profitable arbitrage opportunities across multiple
+                decentralized exchanges with advanced monitoring, AI-powered strategy optimization,
+                and automated execution capabilities.
+              </p>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <Card className="bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md flex items-center">
+                      <Activity className="h-4 w-4 mr-2" />
+                      Price Monitoring
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    Track prices across DEXes in real-time and detect arbitrage opportunities automatically.
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md flex items-center">
+                      <Zap className="h-4 w-4 mr-2" />
+                      Trading Execution
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    Execute trades manually or automatically with customizable risk parameters.
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md flex items-center">
+                      <Cpu className="h-4 w-4 mr-2" />
+                      AI Optimization
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    Leverage AI to optimize trading strategies based on market conditions and performance data.
+                  </CardContent>
+                </Card>
+                
+                <Card className="bg-primary/5">
+                  <CardHeader className="pb-2">
+                    <CardTitle className="text-md flex items-center">
+                      <LineChart className="h-4 w-4 mr-2" />
+                      Performance Analytics
+                    </CardTitle>
+                  </CardHeader>
+                  <CardContent className="text-sm">
+                    Track trading performance with detailed analytics and improvement recommendations.
+                  </CardContent>
+                </Card>
+              </div>
+              
+              {!isWalletConnected && (
+                <Alert variant="warning" className="bg-yellow-50 border-yellow-200 text-yellow-800 dark:bg-yellow-900/20 dark:border-yellow-900 dark:text-yellow-400">
+                  <AlertTriangle className="h-4 w-4" />
+                  <AlertTitle>Connect Wallet</AlertTitle>
+                  <AlertDescription>
+                    Connect your wallet to start using the platform features.
+                  </AlertDescription>
+                </Alert>
+              )}
+            </CardContent>
+            <CardFooter className="flex flex-wrap gap-2">
+              <Button onClick={() => navigate('/dashboard')} className="flex items-center">
+                <LayoutDashboard className="mr-1 h-4 w-4" />
+                Go to Dashboard
+                <ChevronRight className="ml-1 h-4 w-4" />
+              </Button>
+              
+              <Button variant="outline" onClick={() => navigate('/settings')} className="flex items-center">
+                <Settings className="mr-1 h-4 w-4" />
+                Configure Settings
+              </Button>
+              
+              <Button variant="secondary" className="flex items-center ml-auto">
+                <BookText className="mr-1 h-4 w-4" />
+                View Tutorials
+              </Button>
+            </CardFooter>
+          </Card>
+        </div>
         
-        <div className="max-w-3xl mx-auto px-4">
-          <div className="inline-block mb-6">
-            <div className="flex items-center space-x-2 bg-secondary py-1 px-3 rounded-full text-sm">
-              <Zap className="h-4 w-4 text-yellow-500" />
-              <span>Execute flashloan-funded arbitrage trades across DEXes</span>
-            </div>
-          </div>
-          
-          <h1 className="text-4xl md:text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-blue-700">
-            AI-Powered Arbitrage Trading
-          </h1>
-          
-          <p className="text-xl md:text-2xl text-muted-foreground mb-8">
-            Harness the power of flashloans and AI to execute profitable arbitrage trades across decentralized exchanges.
-          </p>
-          
-          <div className="flex flex-col sm:flex-row items-center justify-center space-y-4 sm:space-y-0 sm:space-x-4">
-            <Button asChild size="lg" className="px-8 py-6 text-lg">
-              <Link to="/dashboard">
-                Get Started
-                <ArrowRight className="ml-2 h-5 w-5" />
-              </Link>
-            </Button>
-            
-            <Button asChild variant="outline" size="lg" className="px-8 py-6 text-lg">
-              <a href="#features">
-                Learn More
-              </a>
-            </Button>
-          </div>
+        <div className="lg:col-span-1">
+          <SystemStatus />
         </div>
-      </section>
+      </div>
       
-      {/* Features Section */}
-      <section id="features" className="py-16">
-        <div className="text-center mb-16">
-          <h2 className="text-3xl font-bold mb-4">Why Choose FlashTrade</h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            Our advanced platform provides everything you need to capitalize on DEX arbitrage opportunities.
-          </p>
-        </div>
+      <Tabs defaultValue="documentation" className="space-y-4">
+        <TabsList>
+          <TabsTrigger value="documentation">Documentation</TabsTrigger>
+          <TabsTrigger value="arbitrage">Arbitrage</TabsTrigger>
+          <TabsTrigger value="monitoring">Monitoring</TabsTrigger>
+        </TabsList>
         
-        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto px-4">
-          <GlassCard className="animate-slide-up" style={{animationDelay: '0ms'}}>
-            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6">
-              <Zap className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Flashloan Integration</h3>
-            <p className="text-muted-foreground">
-              Execute large arbitrage trades without needing upfront capital using flashloans.
-            </p>
-          </GlassCard>
-          
-          <GlassCard className="animate-slide-up" style={{animationDelay: '150ms'}}>
-            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6">
-              <RefreshCcw className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Multi-DEX Support</h3>
-            <p className="text-muted-foreground">
-              Connect to multiple DEXes simultaneously to find the best arbitrage opportunities.
-            </p>
-          </GlassCard>
-          
-          <GlassCard className="animate-slide-up" style={{animationDelay: '300ms'}}>
-            <div className="h-12 w-12 rounded-lg bg-primary/10 flex items-center justify-center mb-6">
-              <BarChart2 className="h-6 w-6 text-primary" />
-            </div>
-            <h3 className="text-xl font-bold mb-2">Real-time Monitoring</h3>
-            <p className="text-muted-foreground">
-              Track your transactions and profits with detailed analytics and reporting.
-            </p>
-          </GlassCard>
-        </div>
-      </section>
-      
-      {/* CTA Section */}
-      <section className="py-16">
-        <GlassCard className="max-w-4xl mx-auto text-center py-16">
-          <h2 className="text-3xl font-bold mb-6">Ready to Start Trading?</h2>
-          <p className="text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
-            Connect your wallet and start capitalizing on DEX arbitrage opportunities today.
-          </p>
-          
-          <Button asChild size="lg" className="px-8 py-6 text-lg">
-            <Link to="/dashboard">
-              Go to Dashboard
-              <ArrowRight className="ml-2 h-5 w-5" />
-            </Link>
-          </Button>
-        </GlassCard>
-      </section>
+        <TabsContent value="documentation" className="space-y-4">
+          <Documentation />
+        </TabsContent>
+        
+        <TabsContent value="arbitrage" className="space-y-4">
+          <ArbitragePanel />
+        </TabsContent>
+        
+        <TabsContent value="monitoring" className="space-y-4">
+          <PriceMonitoringPanel />
+        </TabsContent>
+      </Tabs>
     </div>
   );
 };

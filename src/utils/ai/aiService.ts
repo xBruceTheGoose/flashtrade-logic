@@ -2,6 +2,7 @@
 import { Coinbase } from '@coinbase/coinbase-sdk';
 import { logger } from '../monitoring/loggingService';
 import { getAIConfig, saveAIConfig } from './config';
+import { ErrorHandler, ErrorSeverity } from '../integration/errorHandling';
 
 /**
  * Service that interfaces with Coinbase's SDK for AI-powered trading
@@ -26,7 +27,7 @@ export class AIService {
         // Note: Using 'any' type to bypass type checking since the SDK types don't match our usage
         this.client = new (Coinbase as any)({
           apiKey: config.apiKey,
-        });
+        } as any);
         
         this.isInitialized = true;
         logger.info('ai', 'Coinbase AI service initialized successfully');
@@ -49,7 +50,7 @@ export class AIService {
       // Using 'any' type to bypass type checking
       const tempClient = new (Coinbase as any)({
         apiKey: apiKey,
-      });
+      } as any);
       
       // Try to make a simple API call to validate the API key
       // Since we don't know the exact API, we'll try a common pattern
@@ -90,7 +91,10 @@ export class AIService {
       this.initialize();
       logger.info('ai', 'API key updated successfully');
     } catch (error) {
-      logger.error('ai', 'Failed to update API key', { error });
+      ErrorHandler.handleError(error as Error, {
+        module: 'ai',
+        operation: 'setApiKey'
+      }, ErrorSeverity.MEDIUM);
     }
   }
 
@@ -192,7 +196,11 @@ export class AIService {
         reasoning: `Recommendations based on market volatility (${volatility.toFixed(2)}%), network congestion (${congestion}), and historical success rate (${successRate.toFixed(2)}%)`,
       };
     } catch (error) {
-      logger.error('ai', 'Failed to generate strategy recommendations', { error });
+      ErrorHandler.handleError(error as Error, {
+        module: 'ai',
+        operation: 'generateStrategyRecommendations'
+      }, ErrorSeverity.MEDIUM);
+      
       return {
         parameters: {},
         confidence: 0,
@@ -244,7 +252,12 @@ export class AIService {
         confidence,
       };
     } catch (error) {
-      logger.error('ai', 'Failed to predict slippage', { error, tradeData });
+      ErrorHandler.handleError(error as Error, {
+        module: 'ai',
+        operation: 'predictSlippage',
+        data: { tradeData }
+      }, ErrorSeverity.LOW);
+      
       return {
         estimatedSlippage: 0.5, // Default slippage
         confidence: 0,
