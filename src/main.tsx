@@ -1,50 +1,27 @@
 
 import React from 'react';
 import ReactDOM from 'react-dom/client';
-import { createBrowserRouter, RouterProvider } from 'react-router-dom';
-import DashboardLayout from './layouts/DashboardLayout';
-import Index from './pages/Index';
-import Dashboard from './pages/Dashboard';
-import Settings from './pages/Settings';
-import NotFound from './pages/NotFound';
-import Monitoring from './pages/Monitoring';
-
-import { Toaster } from "@/components/ui/sonner";
-import './index.css';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App';
+import './index.css';
 
-const router = createBrowserRouter([
-  {
-    path: '/',
-    element: <DashboardLayout />,
-    children: [
-      {
-        path: '/',
-        element: <Index />,
-      },
-      {
-        path: '/dashboard',
-        element: <Dashboard />,
-      },
-      {
-        path: '/settings',
-        element: <Settings />,
-      },
-      {
-        path: '/monitoring',
-        element: <Monitoring />,
-      },
-      {
-        path: '*',
-        element: <NotFound />,
-      }
-    ],
-  },
-]);
+// Register service worker for offline functionality
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => {
+    navigator.serviceWorker.register('/service-worker.js')
+      .then(registration => {
+        console.log('Service Worker registered with scope:', registration.scope);
+      })
+      .catch(error => {
+        console.error('Service Worker registration failed:', error);
+      });
+  });
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>
-    <RouterProvider router={router} />
-    <Toaster />
+    <BrowserRouter>
+      <App />
+    </BrowserRouter>
   </React.StrictMode>,
 );

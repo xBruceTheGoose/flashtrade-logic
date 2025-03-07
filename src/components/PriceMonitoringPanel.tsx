@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useMemo, memo } from 'react';
 import GlassCard from './ui/GlassCard';
 import { Badge } from "@/components/ui/badge";
 import { Token, DEX } from '@/types';
@@ -15,6 +15,73 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Loader2, Play, PauseCircle, BarChart3, Settings, Shuffle } from 'lucide-react';
 import { priceMonitoringService, TokenPair, PriceHistory, priceHistoryStorage } from '@/utils/blockchain/priceMonitoring';
 import { toast } from '@/hooks/use-toast';
+import { workerManager } from '@/utils/blockchain/priceMonitoring/worker/workerManager';
+
+// Memoized TokenPairItem component to prevent unnecessary re-renders
+const TokenPairItem = memo(({ 
+  pair, 
+  onRemove, 
+  isMonitoring 
+}: { 
+  pair: TokenPair; 
+  onRemove: (pair: TokenPair) => void; 
+  isMonitoring: boolean 
+}) => {
+  return (
+    <div 
+      className="p-3 rounded-md bg-background/50 border border-border/50 flex justify-between items-center"
+    >
+      <div>
+        <div className="flex items-center space-x-2">
+          <span className="font-medium">
+            {pair.tokenA.symbol} / {pair.tokenB.symbol}
+          </span>
+        </div>
+      </div>
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        onClick={() => onRemove(pair)}
+        disabled={isMonitoring}
+      >
+        Remove
+      </Button>
+    </div>
+  );
+});
+
+TokenPairItem.displayName = "TokenPairItem";
+
+// Memoized EmptyState component
+const EmptyState = memo(() => (
+  <div className="text-center p-6 text-muted-foreground">
+    <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
+    <p>No token pairs are being monitored</p>
+    <p className="text-sm mt-1">Add a pair to start monitoring prices</p>
+  </div>
+));
+
+EmptyState.displayName = "EmptyState";
+
+// Memoized StatCard component
+const StatCard = memo(({ title, value, variant = "default" }: { title: string; value: React.ReactNode; variant?: string }) => (
+  <div className="p-4 rounded-md bg-background/50 border border-border/50">
+    <h3 className="text-sm font-medium text-muted-foreground mb-1">{title}</h3>
+    <div className="flex items-center">
+      {variant === "badge" ? (
+        <Badge variant={typeof value === 'boolean' && value ? "default" : "outline"} 
+               className={typeof value === 'boolean' && value ? 
+                 "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}>
+          {value?.toString()}
+        </Badge>
+      ) : (
+        <p className="text-2xl font-semibold">{value}</p>
+      )}
+    </div>
+  </div>
+));
+
+StatCard.displayName = "StatCard";
 
 const PriceMonitoringPanel = () => {
   const { wallet } = useWallet();
@@ -33,19 +100,20 @@ const PriceMonitoringPanel = () => {
     requestsRemaining: 0,
   });
 
-  // Update monitoring stats periodically
-  useEffect(() => {
-    const updateStats = () => {
-      const currentStats = priceMonitoringService.getMonitoringStats();
-      setIsMonitoring(currentStats.isRunning);
-      setStats({
-        monitoredPairsCount: currentStats.monitoredPairsCount,
-        activeDexesCount: currentStats.activeDexesCount,
-        pendingOpportunitiesCount: currentStats.pendingOpportunitiesCount,
-        requestsRemaining: currentStats.requestsRemaining,
-      });
-    };
+  // Update monitoring stats periodically with useCallback to prevent recreation
+  const updateStats = useCallback(() => {
+    const currentStats = priceMonitoringService.getMonitoringStats();
+    setIsMonitoring(currentStats.isRunning);
+    setStats({
+      monitoredPairsCount: currentStats.monitoredPairsCount,
+      activeDexesCount: currentStats.activeDexesCount,
+      pendingOpportunitiesCount: currentStats.pendingOpportunitiesCount,
+      requestsRemaining: currentStats.requestsRemaining,
+    });
+  }, []);
 
+  // Effect for periodic stats updates
+  useEffect(() => {
     // Update stats immediately
     updateStats();
 
@@ -54,14 +122,32 @@ const PriceMonitoringPanel = () => {
 
     // Clean up on unmount
     return () => clearInterval(intervalId);
-  }, []);
+  }, [updateStats]);
 
   // Update monitored pairs when monitoring status changes
   useEffect(() => {
     setMonitoredPairs(priceMonitoringService.getMonitoredPairs());
   }, [isMonitoring]);
 
-  const startMonitoring = async () => {
+  // Memoize token selection options to prevent recreation on each render
+  const tokenAOptions = useMemo(() => 
+    commonTokens.map(token => (
+      <option key={token.address} value={token.address}>
+        {token.symbol} - {token.name}
+      </option>
+    )),
+  []);
+
+  const tokenBOptions = useMemo(() => 
+    commonTokens.map(token => (
+      <option key={token.address} value={token.address}>
+        {token.symbol} - {token.name}
+      </option>
+    )),
+  []);
+
+  // Callbacks for actions to prevent recreation
+  const startMonitoring = useCallback(async () => {
     if (!wallet?.connected) {
       toast({
         title: 'Wallet Required',
@@ -96,14 +182,14 @@ const PriceMonitoringPanel = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [wallet, pollingInterval, minProfitPercentage, autoExecute]);
 
-  const stopMonitoring = () => {
+  const stopMonitoring = useCallback(() => {
     priceMonitoringService.stopMonitoring();
     setIsMonitoring(false);
-  };
+  }, []);
 
-  const addPair = () => {
+  const addPair = useCallback(() => {
     if (selectedTokenA && selectedTokenB && selectedTokenA !== selectedTokenB) {
       const tokenA = commonTokens.find(t => t.address === selectedTokenA);
       const tokenB = commonTokens.find(t => t.address === selectedTokenB);
@@ -131,14 +217,14 @@ const PriceMonitoringPanel = () => {
         variant: 'destructive',
       });
     }
-  };
+  }, [selectedTokenA, selectedTokenB]);
 
-  const removePair = (pair: TokenPair) => {
+  const removePair = useCallback((pair: TokenPair) => {
     priceMonitoringService.removePairFromMonitor(pair.tokenA, pair.tokenB);
     setMonitoredPairs(priceMonitoringService.getMonitoredPairs());
-  };
+  }, []);
 
-  const updateConfig = () => {
+  const updateConfig = useCallback(() => {
     priceMonitoringService.updateConfig({
       pollingInterval: pollingInterval * 1000,
       minProfitPercentage,
@@ -149,7 +235,56 @@ const PriceMonitoringPanel = () => {
       title: 'Configuration Updated',
       description: 'Price monitoring configuration has been updated',
     });
-  };
+  }, [pollingInterval, minProfitPercentage, autoExecute]);
+
+  // Handle running calculations via web worker
+  useEffect(() => {
+    if (isMonitoring && workerManager.isReady()) {
+      // Only run calculations when monitoring is active
+      const calculationInterval = setInterval(async () => {
+        try {
+          // Get prices from the storage
+          const tokens = monitoredPairs.flatMap(pair => [pair.tokenA, pair.tokenB]);
+          const uniqueTokens = Array.from(new Set(tokens.map(t => t.address)))
+            .map(addr => tokens.find(t => t.address === addr))
+            .filter(Boolean) as Token[];
+            
+          if (uniqueTokens.length < 2) return;
+            
+          const prices: Record<string, Record<string, number>> = {};
+          const activeDexes = availableDEXes.filter(dex => dex.active);
+
+          for (const dex of activeDexes) {
+            prices[dex.id] = {};
+            for (const token of uniqueTokens) {
+              const price = priceHistoryStorage.getLatestPrice(token.address, dex.id);
+              if (price !== null) {
+                prices[dex.id][token.address] = price;
+              }
+            }
+          }
+            
+          // Calculate arbitrage opportunities in web worker
+          const gasPrice = await fetch('https://ethgasstation.info/api/ethgasAPI.json')
+            .then(res => res.json())
+            .then(data => data.average * 1e8)
+            .catch(() => 50e9); // Default to 50 Gwei
+            
+          workerManager.calculateArbitrage({
+            prices,
+            tokens: uniqueTokens,
+            minProfitPercentage,
+            gasPrice
+          });
+            
+        } catch (error) {
+          console.error('Error running worker calculations:', error);
+        }
+      }, 15000); // Run every 15 seconds
+        
+      return () => clearInterval(calculationInterval);
+    }
+  }, [isMonitoring, monitoredPairs, minProfitPercentage]);
 
   return (
     <GlassCard className="flex flex-col h-full">
@@ -196,11 +331,7 @@ const PriceMonitoringPanel = () => {
                 value={selectedTokenA}
                 onChange={(e) => setSelectedTokenA(e.target.value)}
               >
-                {commonTokens.map(token => (
-                  <option key={token.address} value={token.address}>
-                    {token.symbol} - {token.name}
-                  </option>
-                ))}
+                {tokenAOptions}
               </select>
             </div>
             <div className="flex-grow">
@@ -211,11 +342,7 @@ const PriceMonitoringPanel = () => {
                 value={selectedTokenB}
                 onChange={(e) => setSelectedTokenB(e.target.value)}
               >
-                {commonTokens.map(token => (
-                  <option key={token.address} value={token.address}>
-                    {token.symbol} - {token.name}
-                  </option>
-                ))}
+                {tokenBOptions}
               </select>
             </div>
             <div className="flex items-end">
@@ -228,34 +355,16 @@ const PriceMonitoringPanel = () => {
 
           <div className="space-y-3 overflow-auto flex-grow">
             {monitoredPairs.length > 0 ? (
-              monitoredPairs.map((pair, index) => (
-                <div 
-                  key={`${pair.tokenA.address}-${pair.tokenB.address}`} 
-                  className="p-3 rounded-md bg-background/50 border border-border/50 flex justify-between items-center"
-                >
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="font-medium">
-                        {pair.tokenA.symbol} / {pair.tokenB.symbol}
-                      </span>
-                    </div>
-                  </div>
-                  <Button 
-                    variant="ghost" 
-                    size="sm" 
-                    onClick={() => removePair(pair)}
-                    disabled={isMonitoring}
-                  >
-                    Remove
-                  </Button>
-                </div>
+              monitoredPairs.map((pair) => (
+                <TokenPairItem 
+                  key={`${pair.tokenA.address}-${pair.tokenB.address}`}
+                  pair={pair}
+                  onRemove={removePair}
+                  isMonitoring={isMonitoring}
+                />
               ))
             ) : (
-              <div className="text-center p-6 text-muted-foreground">
-                <BarChart3 className="h-12 w-12 mx-auto mb-3 opacity-20" />
-                <p>No token pairs are being monitored</p>
-                <p className="text-sm mt-1">Add a pair to start monitoring prices</p>
-              </div>
+              <EmptyState />
             )}
           </div>
         </TabsContent>
@@ -311,35 +420,20 @@ const PriceMonitoringPanel = () => {
 
         <TabsContent value="stats">
           <div className="grid grid-cols-2 gap-4">
-            <div className="p-4 rounded-md bg-background/50 border border-border/50">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Monitoring Status</h3>
-              <div className="flex items-center">
-                <Badge variant={isMonitoring ? "default" : "outline"} className={isMonitoring ? "bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100" : ""}>
-                  {isMonitoring ? "Active" : "Inactive"}
-                </Badge>
-              </div>
-            </div>
-
-            <div className="p-4 rounded-md bg-background/50 border border-border/50">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Monitored Pairs</h3>
-              <p className="text-2xl font-semibold">{stats.monitoredPairsCount}</p>
-            </div>
-
-            <div className="p-4 rounded-md bg-background/50 border border-border/50">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Active DEXes</h3>
-              <p className="text-2xl font-semibold">{stats.activeDexesCount}</p>
-            </div>
-
-            <div className="p-4 rounded-md bg-background/50 border border-border/50">
-              <h3 className="text-sm font-medium text-muted-foreground mb-1">Pending Opportunities</h3>
-              <p className="text-2xl font-semibold">{stats.pendingOpportunitiesCount}</p>
-            </div>
+            <StatCard 
+              title="Monitoring Status" 
+              value={isMonitoring ? "Active" : "Inactive"} 
+              variant="badge" 
+            />
+            <StatCard title="Monitored Pairs" value={stats.monitoredPairsCount} />
+            <StatCard title="Active DEXes" value={stats.activeDexesCount} />
+            <StatCard title="Pending Opportunities" value={stats.pendingOpportunitiesCount} />
 
             <div className="p-4 rounded-md bg-background/50 border border-border/50 col-span-2">
               <h3 className="text-sm font-medium text-muted-foreground mb-1">API Rate Limit</h3>
               <div className="w-full bg-secondary rounded-full h-2.5 mt-2">
                 <div 
-                  className="bg-primary h-2.5 rounded-full" 
+                  className="bg-primary h-2.5 rounded-full transition-all duration-300" 
                   style={{ width: `${(stats.requestsRemaining / 60) * 100}%` }}
                 ></div>
               </div>
