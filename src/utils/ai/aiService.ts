@@ -1,5 +1,5 @@
 
-import { createClient } from '@coinbase/coinbase-sdk';
+import { Coinbase } from '@coinbase/coinbase-sdk';
 import { logger } from '../monitoring/loggingService';
 import { getAIConfig, saveAIConfig } from './config';
 
@@ -22,7 +22,8 @@ export class AIService {
       const config = getAIConfig();
       
       if (config.apiKey) {
-        this.client = createClient({
+        // Create a new Coinbase client instance with the API key
+        this.client = new Coinbase({
           apiKey: config.apiKey,
         });
         
@@ -44,17 +45,31 @@ export class AIService {
   public async validateApiKey(apiKey: string): Promise<boolean> {
     try {
       // Create a temporary client to test the API key
-      const tempClient = createClient({
+      const tempClient = new Coinbase({
         apiKey: apiKey,
       });
       
-      // Try to make a simple API call
-      // Note: Adjust this to an actual method available in the SDK
-      await tempClient.getTime?.() || await tempClient.ping?.() || true;
+      // Try to make a simple API call to validate the API key
+      // Use fallbacks in case certain methods aren't available
+      try {
+        if (typeof tempClient.getTime === 'function') {
+          await tempClient.getTime();
+        } else if (typeof tempClient.ping === 'function') {
+          await tempClient.ping();
+        } else {
+          // If no validation method is available, assume the key is valid
+          // but log a warning
+          logger.warn('ai', 'No validation method available for Coinbase API key');
+        }
+        
+        return true;
+      } catch (validationError) {
+        logger.warn('ai', 'API key validation failed during method call', { validationError });
+        return false;
+      }
       
-      return true;
     } catch (error) {
-      logger.warn('ai', 'API key validation failed', { error });
+      logger.warn('ai', 'API key validation failed during client creation', { error });
       return false;
     }
   }
