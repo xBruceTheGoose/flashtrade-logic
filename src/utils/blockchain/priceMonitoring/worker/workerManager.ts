@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid';
 interface WorkerRequest {
   resolve: (result: any) => void;
   reject: (error: Error) => void;
-  timeout: number | null;
+  timeout: ReturnType<typeof setTimeout> | null;
 }
 
 // Worker manager to handle web worker communication
@@ -141,15 +141,15 @@ class WorkerManager {
     console.warn(`Processing ${type} on main thread due to lack of worker support`);
     
     // Dynamic import the worker code directly
-    const workerFunctions = await import('./priceCalculationWorker');
+    const workerModule = await import('./priceCalculationWorker');
     
     switch (type) {
       case 'calculate_arbitrage':
-        return workerFunctions.calculateArbitrageOpportunities(data);
+        return workerModule.calculateArbitrageOpportunities(data);
       case 'calculate_volatility':
-        return workerFunctions.calculateVolatility(data);
+        return workerModule.calculateVolatility(data);
       case 'process_price_data':
-        return workerFunctions.processPriceData(data);
+        return workerModule.processPriceData(data);
       default:
         throw new Error(`Unknown worker operation: ${type}`);
     }

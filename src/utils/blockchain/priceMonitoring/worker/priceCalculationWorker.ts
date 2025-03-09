@@ -63,7 +63,7 @@ self.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
 });
 
 // Calculate arbitrage opportunities across DEXes
-function calculateArbitrageOpportunities(data: {
+export function calculateArbitrageOpportunities(data: {
   prices: Record<string, Record<string, number>>;
   tokens: any[];
   minProfitPercentage: number;
@@ -138,7 +138,7 @@ function calculateArbitrageOpportunities(data: {
 }
 
 // Calculate volatility for a token
-function calculateVolatility(data: {
+export function calculateVolatility(data: {
   priceHistory: number[];
   timeIntervals: number[];
 }) {
@@ -166,7 +166,7 @@ function calculateVolatility(data: {
 }
 
 // Process price data for visualization
-function processPriceData(data: {
+export function processPriceData(data: {
   priceHistory: any[];
   interval: 'minute' | 'hour' | 'day';
 }) {
