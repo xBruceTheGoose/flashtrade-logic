@@ -9,15 +9,33 @@ import Index from "./pages/Index";
 import Dashboard from "./pages/Dashboard";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 import { systemIntegration } from "./utils/integration/systemIntegration";
 import { logger } from "./utils/monitoring/loggingService";
+import { workerManager } from "./utils/blockchain/priceMonitoring/worker/workerManager";
 
-const queryClient = new QueryClient();
+// Create a QueryClient with optimized settings
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      staleTime: 30000,
+      gcTime: 300000,
+      refetchOnWindowFocus: false
+    }
+  }
+});
 
 const App = () => {
+  // Use ref to track initialization state
+  const initialized = useRef(false);
+  
   // Initialize system when the app loads
   useEffect(() => {
+    if (initialized.current) return;
+    
+    initialized.current = true;
+    
     const initializeSystem = async () => {
       logger.info('app', 'Initializing application');
       await systemIntegration.initialize();
@@ -26,8 +44,38 @@ const App = () => {
     
     initializeSystem();
     
+    // Add event listener for offline/online status
+    const handleConnectionChange = () => {
+      if (navigator.onLine) {
+        logger.info('app', 'Application is online');
+        // Reinitialize if was offline
+        systemIntegration.initialize();
+      } else {
+        logger.warn('app', 'Application is offline');
+      }
+    };
+    
+    window.addEventListener('online', handleConnectionChange);
+    window.addEventListener('offline', handleConnectionChange);
+    
+    // Register beforeunload handler to clean up resources
+    const handleBeforeUnload = () => {
+      logger.info('app', 'Application unloading');
+      // Clean up resources
+      workerManager.terminateWorker();
+    };
+    
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    
     return () => {
-      // Clean up on unmount if needed
+      // Clean up on unmount
+      window.removeEventListener('online', handleConnectionChange);
+      window.removeEventListener('offline', handleConnectionChange);
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+      
+      systemIntegration.shutdown();
+      workerManager.terminateWorker();
+      
       logger.info('app', 'Application shutdown');
     };
   }, []);

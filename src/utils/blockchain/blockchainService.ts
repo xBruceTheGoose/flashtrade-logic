@@ -1,16 +1,20 @@
+
 import { logger } from '../monitoring/loggingService';
 import { ethers } from 'ethers';
+import { toast } from '@/hooks/use-toast';
 
 // Cache configuration
 interface CacheConfig {
   maxAge: number; // milliseconds
   maxSize: number; // number of entries
+  cleanupInterval: number; // milliseconds
 }
 
 // Cache entry
 interface CacheEntry<T> {
   value: T;
   timestamp: number;
+  hits: number;
 }
 
 // Request batch
@@ -20,6 +24,9 @@ interface RequestBatch<T> {
   resolvers: ((value: T) => void)[];
   rejecters: ((reason: any) => void)[];
 }
+
+// Connection state
+type ConnectionState = 'connecting' | 'connected' | 'disconnected' | 'error';
 
 export interface BlockchainService {
   provider: ethers.providers.Provider | null;
@@ -32,30 +39,103 @@ export interface BlockchainService {
 export class BlockchainServiceImpl implements BlockchainService {
   provider: ethers.providers.Provider | null = null;
   private cache: Map<string, CacheEntry<any>> = new Map();
+  private pendingBatches: Map<string, RequestBatch<any>> = new Map();
+  private connectionState: ConnectionState = 'disconnected';
+  private connectionAttempts: number = 0;
+  private maxConnectionAttempts: number = 3;
+  private reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+  
+  // Configuration
   private cacheConfig: CacheConfig = {
     maxAge: 10000, // 10 seconds default cache time
-    maxSize: 100 // Maximum 100 entries in cache
+    maxSize: 200, // Maximum 200 entries in cache
+    cleanupInterval: 60000 // Clean cache every minute
   };
-  private pendingBatches: Map<string, RequestBatch<any>> = new Map();
   private batchWindow: number = 50; // ms to batch requests
   private lastCacheCleanup: number = Date.now();
-  private cleanupInterval: number = 60000; // Clean cache every minute
   
   constructor() {
-    // Initialize provider
+    this.initializeProvider();
+    
+    // Set up periodic cache cleanup
+    setInterval(() => this.cleanupCache(), this.cacheConfig.cleanupInterval);
+  }
+  
+  private async initializeProvider(): Promise<void> {
     try {
+      this.connectionState = 'connecting';
+      this.connectionAttempts++;
+      
+      logger.info('blockchain', 'Initializing blockchain provider...');
+      
       // Check if window.ethereum exists (MetaMask or other injected provider)
       if (typeof window !== 'undefined' && window.ethereum) {
         this.provider = new ethers.providers.Web3Provider(window.ethereum);
-        logger.info('blockchain', 'Blockchain provider initialized successfully');
+        
+        // Set up event listeners for connection status
+        window.ethereum.on('connect', () => {
+          logger.info('blockchain', 'Provider connected');
+          this.connectionState = 'connected';
+          this.connectionAttempts = 0;
+        });
+        
+        window.ethereum.on('disconnect', (error: any) => {
+          logger.warn('blockchain', 'Provider disconnected', { error });
+          this.connectionState = 'disconnected';
+          this.scheduleReconnect();
+        });
+        
+        window.ethereum.on('chainChanged', (_chainId: string) => {
+          logger.info('blockchain', 'Network changed, reloading...');
+          window.location.reload();
+        });
+        
+        // Test connection
+        const network = await this.provider.getNetwork();
+        this.connectionState = 'connected';
+        this.connectionAttempts = 0;
+        
+        logger.info('blockchain', 'Blockchain provider initialized successfully', { 
+          network: network.name, 
+          chainId: network.chainId 
+        });
       } else {
         // Fallback to a public provider for read-only functionality
         this.provider = ethers.getDefaultProvider('mainnet');
+        this.connectionState = 'connected';
         logger.warn('blockchain', 'No wallet detected, using fallback read-only provider');
       }
     } catch (error) {
+      this.connectionState = 'error';
       logger.error('blockchain', 'Failed to initialize blockchain provider', { error });
       this.provider = null;
+      
+      this.scheduleReconnect();
+    }
+  }
+  
+  private scheduleReconnect(): void {
+    if (this.reconnectTimeout) {
+      clearTimeout(this.reconnectTimeout);
+    }
+    
+    // Exponential backoff for reconnect attempts
+    const delay = Math.min(1000 * Math.pow(2, this.connectionAttempts - 1), 30000);
+    
+    if (this.connectionAttempts <= this.maxConnectionAttempts) {
+      logger.info('blockchain', `Scheduling reconnect attempt ${this.connectionAttempts} in ${delay}ms`);
+      
+      this.reconnectTimeout = setTimeout(() => {
+        this.initializeProvider();
+      }, delay);
+    } else {
+      logger.error('blockchain', 'Max reconnection attempts reached');
+      
+      toast({
+        title: 'Connection Error',
+        description: 'Failed to connect to blockchain after multiple attempts. Please check your network connection.',
+        variant: 'destructive',
+      });
     }
   }
   
@@ -65,8 +145,10 @@ export class BlockchainServiceImpl implements BlockchainService {
     try {
       // Test the connection by requesting the network
       const network = await this.provider.getNetwork();
+      this.connectionState = 'connected';
       return network.chainId > 0;
     } catch (error) {
+      this.connectionState = 'error';
       logger.error('blockchain', 'Provider connection check failed', { error });
       return false;
     }
@@ -133,8 +215,9 @@ export class BlockchainServiceImpl implements BlockchainService {
       throw new Error('No provider available');
     }
     
-    // Clean up cache if needed
-    this.cleanupCacheIfNeeded();
+    if (this.connectionState !== 'connected') {
+      throw new Error('Provider not connected');
+    }
     
     // Create a unique key for this request
     const requestKey = `${method}:${JSON.stringify(params)}`;
@@ -190,8 +273,15 @@ export class BlockchainServiceImpl implements BlockchainService {
       // Execute the request
       const result = await (this.provider as any)[method](...params);
       
-      // Cache the result
-      this.addToCache(requestKey, result);
+      // Cache the result - adjust TTL based on method type
+      let cacheTTL = this.cacheConfig.maxAge;
+      if (method.includes('getBlock') || method.includes('getTransaction')) {
+        cacheTTL = 60000; // Cache blocks and txs longer (1 minute)
+      } else if (method.includes('getCode') || method.includes('getStorageAt')) {
+        cacheTTL = 300000; // Cache contract code and storage even longer (5 minutes)
+      }
+      
+      this.addToCache(requestKey, result, cacheTTL);
       
       // Resolve all promises
       batch.resolvers.forEach(resolve => resolve(result));
@@ -199,6 +289,16 @@ export class BlockchainServiceImpl implements BlockchainService {
       // Reject all promises
       batch.rejecters.forEach(reject => reject(error));
       logger.error('blockchain', `Batch execution failed for ${method}`, { error, params });
+      
+      // If this is a connection error, update connection state
+      if (
+        error.message?.includes('connection') || 
+        error.message?.includes('network') ||
+        error.message?.includes('disconnected')
+      ) {
+        this.connectionState = 'disconnected';
+        this.scheduleReconnect();
+      }
     }
   }
   
@@ -206,25 +306,13 @@ export class BlockchainServiceImpl implements BlockchainService {
   private addToCache<T>(key: string, value: T, customMaxAge?: number): void {
     // Enforce cache size limit
     if (this.cache.size >= this.cacheConfig.maxSize) {
-      // Remove oldest entry
-      let oldestKey: string | null = null;
-      let oldestTime = Date.now();
-      
-      for (const [k, entry] of this.cache.entries()) {
-        if (entry.timestamp < oldestTime) {
-          oldestTime = entry.timestamp;
-          oldestKey = k;
-        }
-      }
-      
-      if (oldestKey) {
-        this.cache.delete(oldestKey);
-      }
+      this.pruneCache();
     }
     
     this.cache.set(key, {
       value,
-      timestamp: Date.now()
+      timestamp: Date.now(),
+      hits: 1
     });
   }
   
@@ -242,19 +330,46 @@ export class BlockchainServiceImpl implements BlockchainService {
       return null;
     }
     
+    // Increment hit count
+    entry.hits++;
+    
     return entry.value as T;
   }
   
-  private cleanupCacheIfNeeded(): void {
+  private pruneCache(): void {
+    // Strategy: remove least recently used or least frequently used entries
+    // We'll use a combination approach
+    
+    // First, remove expired entries
     const now = Date.now();
-    if (now - this.lastCacheCleanup > this.cleanupInterval) {
-      this.lastCacheCleanup = now;
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > this.cacheConfig.maxAge) {
+        this.cache.delete(key);
+      }
+    }
+    
+    // If still over limit, remove least frequently used entries
+    if (this.cache.size >= this.cacheConfig.maxSize) {
+      // Sort entries by hit count
+      const entries = Array.from(this.cache.entries())
+        .sort((a, b) => a[1].hits - b[1].hits);
       
-      // Remove expired entries
-      for (const [key, entry] of this.cache.entries()) {
-        if (now - entry.timestamp > this.cacheConfig.maxAge) {
-          this.cache.delete(key);
-        }
+      // Remove bottom 20%
+      const toRemove = Math.ceil(this.cacheConfig.maxSize * 0.2);
+      for (let i = 0; i < toRemove && i < entries.length; i++) {
+        this.cache.delete(entries[i][0]);
+      }
+    }
+  }
+  
+  private cleanupCache(): void {
+    const now = Date.now();
+    this.lastCacheCleanup = now;
+    
+    // Remove expired entries
+    for (const [key, entry] of this.cache.entries()) {
+      if (now - entry.timestamp > this.cacheConfig.maxAge) {
+        this.cache.delete(key);
       }
     }
   }
@@ -273,9 +388,34 @@ export class BlockchainServiceImpl implements BlockchainService {
   clearCache(): void {
     this.cache.clear();
     this.lastCacheCleanup = Date.now();
+    logger.info('blockchain', 'Cache cleared');
   }
   
-  // ... other methods
+  // Public getter for connection state
+  getConnectionState(): ConnectionState {
+    return this.connectionState;
+  }
+  
+  // Get current provider
+  getCurrentProvider(): ethers.providers.Provider {
+    if (!this.provider) {
+      throw new Error('No provider available');
+    }
+    return this.provider;
+  }
+  
+  // Get signer (if available)
+  getSigner(): ethers.Signer | null {
+    if (this.provider instanceof ethers.providers.Web3Provider) {
+      try {
+        return this.provider.getSigner();
+      } catch (error) {
+        logger.error('blockchain', 'Failed to get signer', { error });
+        return null;
+      }
+    }
+    return null;
+  }
 }
 
 export const blockchainService = new BlockchainServiceImpl();

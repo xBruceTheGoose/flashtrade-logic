@@ -20,25 +20,87 @@ interface WorkerResponse {
   error?: string;
 }
 
+// Cache for expensive calculations
+const calculationCache = new Map<string, {
+  result: any;
+  timestamp: number;
+}>();
+
+// Max cache size and age
+const MAX_CACHE_SIZE = 100;
+const MAX_CACHE_AGE_MS = 60000; // 1 minute
+
+// Helper to get from cache
+function getFromCache<T>(cacheKey: string): T | null {
+  const cached = calculationCache.get(cacheKey);
+  if (!cached) return null;
+  
+  // Check if cache entry is still valid
+  if (Date.now() - cached.timestamp > MAX_CACHE_AGE_MS) {
+    calculationCache.delete(cacheKey);
+    return null;
+  }
+  
+  return cached.result as T;
+}
+
+// Helper to add to cache
+function addToCache(cacheKey: string, result: any): void {
+  // Enforce size limit
+  if (calculationCache.size >= MAX_CACHE_SIZE) {
+    // Remove oldest entry
+    let oldestKey: string | null = null;
+    let oldestTime = Date.now();
+    
+    for (const [key, entry] of calculationCache.entries()) {
+      if (entry.timestamp < oldestTime) {
+        oldestTime = entry.timestamp;
+        oldestKey = key;
+      }
+    }
+    
+    if (oldestKey) {
+      calculationCache.delete(oldestKey);
+    }
+  }
+  
+  calculationCache.set(cacheKey, {
+    result,
+    timestamp: Date.now()
+  });
+}
+
 // Listen for messages from the main thread
 self.addEventListener('message', (event: MessageEvent<WorkerMessage>) => {
   const { id, type, data } = event.data;
   
   try {
     let result;
+    // Generate cache key based on operation type and stringified data
+    const cacheKey = `${type}:${JSON.stringify(data)}`;
     
-    switch (type) {
-      case 'calculate_arbitrage':
-        result = calculateArbitrageOpportunities(data);
-        break;
-      case 'calculate_volatility':
-        result = calculateVolatility(data);
-        break;
-      case 'process_price_data':
-        result = processPriceData(data);
-        break;
-      default:
-        throw new Error(`Unknown worker message type: ${type}`);
+    // Check cache first
+    const cachedResult = getFromCache(cacheKey);
+    if (cachedResult) {
+      result = cachedResult;
+    } else {
+      // Perform calculation if not cached
+      switch (type) {
+        case 'calculate_arbitrage':
+          result = calculateArbitrageOpportunities(data);
+          break;
+        case 'calculate_volatility':
+          result = calculateVolatility(data);
+          break;
+        case 'process_price_data':
+          result = processPriceData(data);
+          break;
+        default:
+          throw new Error(`Unknown worker message type: ${type}`);
+      }
+      
+      // Cache the result
+      addToCache(cacheKey, result);
     }
     
     // Send the result back to the main thread
@@ -72,13 +134,42 @@ export function calculateArbitrageOpportunities(data: {
   const { prices, tokens, minProfitPercentage, gasPrice } = data;
   const opportunities = [];
   
-  // Get all token pairs
+  // Get unique DEXes
+  const dexes = Object.keys(prices);
+  
+  // Precompute price ratios for all token pairs to avoid redundant calculations
+  const priceRatios: Record<string, Record<string, Record<string, number>>> = {};
+  
+  for (const dex of dexes) {
+    priceRatios[dex] = {};
+    const dexPrices = prices[dex];
+    
+    for (let i = 0; i < tokens.length; i++) {
+      const tokenA = tokens[i];
+      priceRatios[dex][tokenA.address] = {};
+      
+      for (let j = 0; j < tokens.length; j++) {
+        if (i === j) continue;
+        
+        const tokenB = tokens[j];
+        
+        // Skip if either token doesn't have price data
+        if (!dexPrices[tokenA.address] || !dexPrices[tokenB.address]) {
+          continue;
+        }
+        
+        // Calculate price ratio
+        priceRatios[dex][tokenA.address][tokenB.address] = 
+          dexPrices[tokenA.address] / dexPrices[tokenB.address];
+      }
+    }
+  }
+  
+  // Find arbitrage opportunities
   for (let i = 0; i < tokens.length; i++) {
     for (let j = i + 1; j < tokens.length; j++) {
       const tokenA = tokens[i];
       const tokenB = tokens[j];
-      
-      const dexes = Object.keys(prices);
       
       // Compare prices across DEXes
       for (let dex1Index = 0; dex1Index < dexes.length; dex1Index++) {
@@ -86,20 +177,15 @@ export function calculateArbitrageOpportunities(data: {
           const dex1 = dexes[dex1Index];
           const dex2 = dexes[dex2Index];
           
-          const dex1Prices = prices[dex1];
-          const dex2Prices = prices[dex2];
-          
-          // Skip if either DEX doesn't have both tokens
-          if (!dex1Prices[tokenA.address] || !dex1Prices[tokenB.address] ||
-              !dex2Prices[tokenA.address] || !dex2Prices[tokenB.address]) {
+          // Skip if price ratio isn't available for either DEX
+          if (!priceRatios[dex1][tokenA.address]?.[tokenB.address] || 
+              !priceRatios[dex2][tokenA.address]?.[tokenB.address]) {
             continue;
           }
           
-          // Calculate price ratio at DEX 1
-          const priceRatioDex1 = dex1Prices[tokenA.address] / dex1Prices[tokenB.address];
-          
-          // Calculate price ratio at DEX 2
-          const priceRatioDex2 = dex2Prices[tokenA.address] / dex2Prices[tokenB.address];
+          // Get price ratios
+          const priceRatioDex1 = priceRatios[dex1][tokenA.address][tokenB.address];
+          const priceRatioDex2 = priceRatios[dex2][tokenA.address][tokenB.address];
           
           // Calculate profit percentage
           const profitPercentage = Math.abs(priceRatioDex1 - priceRatioDex2) / 
@@ -122,9 +208,9 @@ export function calculateArbitrageOpportunities(data: {
               profitPercentage,
               estimatedProfit,
               priceA: priceRatioDex1 < priceRatioDex2 ? 
-                     dex1Prices[tokenA.address] : dex2Prices[tokenA.address],
+                     prices[dex1][tokenA.address] : prices[dex2][tokenA.address],
               priceB: priceRatioDex1 < priceRatioDex2 ? 
-                     dex1Prices[tokenB.address] : dex2Prices[tokenB.address],
+                     prices[dex1][tokenB.address] : prices[dex2][tokenB.address],
               timestamp: Date.now()
             });
           }
@@ -157,9 +243,17 @@ export function calculateVolatility(data: {
     returns.push(logReturn / Math.sqrt(timeDiff) * Math.sqrt(525600)); // 525600 = minutes in a year
   }
   
-  // Calculate standard deviation
-  const mean = returns.reduce((sum, val) => sum + val, 0) / returns.length;
-  const variance = returns.reduce((sum, val) => sum + Math.pow(val - mean, 2), 0) / returns.length;
+  // Calculate standard deviation using an optimized one-pass algorithm
+  let sum = 0;
+  let sumSq = 0;
+  
+  for (const ret of returns) {
+    sum += ret;
+    sumSq += ret * ret;
+  }
+  
+  const mean = sum / returns.length;
+  const variance = (sumSq / returns.length) - (mean * mean);
   const volatility = Math.sqrt(variance) * 100; // Convert to percentage
   
   return volatility;
@@ -204,8 +298,9 @@ export function processPriceData(data: {
         high: point.price,
         low: point.price,
         close: point.price,
-        volume: 0,
-        timestamp: intervalStart
+        volume: point.volume || 0,
+        timestamp: intervalStart,
+        count: 1
       });
     } else {
       const candle = groupedData.get(intervalStart);
@@ -216,8 +311,11 @@ export function processPriceData(data: {
       if (point.volume) {
         candle.volume += point.volume;
       }
+      candle.count += 1;
     }
   }
   
-  return Array.from(groupedData.values());
+  // Convert the Map to an array and sort by timestamp
+  return Array.from(groupedData.values())
+    .sort((a, b) => a.timestamp - b.timestamp);
 }

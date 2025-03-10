@@ -14,6 +14,8 @@ class WorkerManager {
   private pendingRequests: Map<string, WorkerRequest> = new Map();
   private isWorkerSupported: boolean = typeof Worker !== 'undefined';
   private isInitialized: boolean = false;
+  private terminationTimer: ReturnType<typeof setTimeout> | null = null;
+  private idleTimeout = 60000; // Terminate worker after 1 minute of inactivity
   
   constructor() {
     if (this.isWorkerSupported) {
@@ -40,6 +42,7 @@ class WorkerManager {
       this.worker.onerror = this.handleWorkerError.bind(this);
       
       this.isInitialized = true;
+      console.log('Web worker initialized successfully');
     } catch (error) {
       console.error('Failed to initialize web worker:', error);
       this.isWorkerSupported = false;
@@ -65,6 +68,9 @@ class WorkerManager {
     } else {
       request.resolve(result);
     }
+    
+    // Schedule worker termination if no pending requests
+    this.scheduleTerminationIfIdle();
   }
   
   private handleWorkerError(error: ErrorEvent): void {
@@ -81,12 +87,39 @@ class WorkerManager {
     this.initialize();
   }
   
+  private scheduleTerminationIfIdle(): void {
+    // Clear any existing termination timer
+    if (this.terminationTimer !== null) {
+      clearTimeout(this.terminationTimer);
+      this.terminationTimer = null;
+    }
+    
+    // If there are no pending requests, schedule termination
+    if (this.pendingRequests.size === 0) {
+      this.terminationTimer = setTimeout(() => {
+        this.terminateWorker();
+        this.terminationTimer = null;
+      }, this.idleTimeout);
+    }
+  }
+  
   async calculateArbitrage(data: {
     prices: Record<string, Record<string, number>>;
     tokens: any[];
     minProfitPercentage: number;
     gasPrice: number;
   }): Promise<any[]> {
+    // Cancel termination if scheduled
+    if (this.terminationTimer !== null) {
+      clearTimeout(this.terminationTimer);
+      this.terminationTimer = null;
+    }
+    
+    // Re-initialize worker if it was terminated
+    if (!this.isInitialized) {
+      this.initialize();
+    }
+    
     return this.sendToWorker('calculate_arbitrage', data);
   }
   
@@ -94,6 +127,17 @@ class WorkerManager {
     priceHistory: number[];
     timeIntervals: number[];
   }): Promise<number> {
+    // Cancel termination if scheduled
+    if (this.terminationTimer !== null) {
+      clearTimeout(this.terminationTimer);
+      this.terminationTimer = null;
+    }
+    
+    // Re-initialize worker if it was terminated
+    if (!this.isInitialized) {
+      this.initialize();
+    }
+    
     return this.sendToWorker('calculate_volatility', data);
   }
   
@@ -101,13 +145,33 @@ class WorkerManager {
     priceHistory: any[];
     interval: 'minute' | 'hour' | 'day';
   }): Promise<any[]> {
+    // Cancel termination if scheduled
+    if (this.terminationTimer !== null) {
+      clearTimeout(this.terminationTimer);
+      this.terminationTimer = null;
+    }
+    
+    // Re-initialize worker if it was terminated
+    if (!this.isInitialized) {
+      this.initialize();
+    }
+    
     return this.sendToWorker('process_price_data', data);
   }
   
   private async sendToWorker<T>(type: string, data: any, timeoutMs: number = 30000): Promise<T> {
-    if (!this.isWorkerSupported || !this.worker) {
+    if (!this.isWorkerSupported) {
       // Fallback to main thread processing if workers aren't supported
       return this.processOnMainThread(type, data);
+    }
+    
+    // Ensure worker is initialized
+    if (!this.isInitialized) {
+      this.initialize();
+    }
+    
+    if (!this.worker) {
+      throw new Error('Failed to initialize worker');
     }
     
     return new Promise<T>((resolve, reject) => {
@@ -129,7 +193,7 @@ class WorkerManager {
       });
       
       // Send the message to the worker
-      this.worker.postMessage({
+      this.worker!.postMessage({
         id,
         type,
         data
@@ -170,10 +234,21 @@ class WorkerManager {
       request.reject(new Error('Worker terminated'));
       this.pendingRequests.delete(id);
     }
+    
+    // Clear termination timer if it exists
+    if (this.terminationTimer !== null) {
+      clearTimeout(this.terminationTimer);
+      this.terminationTimer = null;
+    }
   }
   
   isReady(): boolean {
     return this.isWorkerSupported && this.isInitialized;
+  }
+  
+  // Allow configuration of idle timeout
+  setIdleTimeout(timeoutMs: number): void {
+    this.idleTimeout = timeoutMs;
   }
 }
 

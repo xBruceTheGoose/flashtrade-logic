@@ -9,6 +9,13 @@ import { availableDEXes } from '@/utils/dex';
 import { getWETHAddress } from './utils/common';
 import { getBestPrice, findBestTradeRoute } from './utils/trades';
 import { executeSwap, executeBestSwap } from './utils/swaps';
+import { logger } from '@/utils/monitoring/loggingService';
+
+// Cache for DEX operations
+interface CacheEntry<T> {
+  value: T;
+  timestamp: number;
+}
 
 /**
  * Manager class for interacting with multiple DEXes
@@ -18,6 +25,11 @@ export class DEXManager {
   private chainId: number;
   private ready: boolean = false;
   private activeAdapters: string[] = [];
+  private cache: Map<string, CacheEntry<any>> = new Map();
+  private readonly cacheTTL = 30000; // 30 seconds cache time
+  private readonly cacheMaxSize = 200;
+  private lastCacheCleanup = Date.now();
+  private readonly cleanupInterval = 60000; // Cleanup every minute
 
   constructor(chainId: number = 1) {
     this.chainId = chainId;
@@ -30,6 +42,7 @@ export class DEXManager {
   private async init(): Promise<void> {
     try {
       const provider = blockchain.getCurrentProvider();
+      logger.info('dex', 'Initializing DEX manager');
       
       // Create adapter configs
       const config: DEXAdapterConfig = {
@@ -60,8 +73,9 @@ export class DEXManager {
       this.updateActiveAdapters();
       
       this.ready = true;
+      logger.info('dex', 'DEX manager initialized successfully');
     } catch (error) {
-      console.error('Error initializing DEX manager:', error);
+      logger.error('dex', 'Error initializing DEX manager:', error);
       this.ready = false;
     }
   }
@@ -73,6 +87,73 @@ export class DEXManager {
     this.activeAdapters = availableDEXes
       .filter(dex => dex.active)
       .map(dex => dex.id);
+  }
+
+  /**
+   * Add to cache
+   */
+  private addToCache<T>(key: string, value: T): void {
+    // Clean cache if needed
+    this.cleanCacheIfNeeded();
+    
+    // Enforce cache size limit
+    if (this.cache.size >= this.cacheMaxSize) {
+      // Remove oldest entry
+      let oldestKey: string | null = null;
+      let oldestTime = Date.now();
+      
+      for (const [k, entry] of this.cache.entries()) {
+        if (entry.timestamp < oldestTime) {
+          oldestTime = entry.timestamp;
+          oldestKey = k;
+        }
+      }
+      
+      if (oldestKey) {
+        this.cache.delete(oldestKey);
+      }
+    }
+    
+    this.cache.set(key, {
+      value,
+      timestamp: Date.now()
+    });
+  }
+
+  /**
+   * Get from cache
+   */
+  private getFromCache<T>(key: string): T | null {
+    const entry = this.cache.get(key);
+    
+    if (!entry) {
+      return null;
+    }
+    
+    // Check if entry is still valid
+    if (Date.now() - entry.timestamp > this.cacheTTL) {
+      this.cache.delete(key);
+      return null;
+    }
+    
+    return entry.value as T;
+  }
+
+  /**
+   * Clean cache if needed
+   */
+  private cleanCacheIfNeeded(): void {
+    const now = Date.now();
+    if (now - this.lastCacheCleanup > this.cleanupInterval) {
+      this.lastCacheCleanup = now;
+      
+      // Remove expired entries
+      for (const [key, entry] of this.cache.entries()) {
+        if (now - entry.timestamp > this.cacheTTL) {
+          this.cache.delete(key);
+        }
+      }
+    }
   }
 
   /**
@@ -109,7 +190,24 @@ export class DEXManager {
     dexId: string;
     dexName: string;
   }> {
-    return getBestPrice(this.getActiveAdapters(), tokenA, tokenB);
+    // Check cache first
+    const cacheKey = `best_price:${tokenA.address}:${tokenB.address}`;
+    const cached = this.getFromCache<{
+      price: number;
+      dexId: string;
+      dexName: string;
+    }>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const result = await getBestPrice(this.getActiveAdapters(), tokenA, tokenB);
+    
+    // Cache the result
+    this.addToCache(cacheKey, result);
+    
+    return result;
   }
 
   /**
@@ -120,7 +218,22 @@ export class DEXManager {
     tokenOut: Token,
     amountIn: string
   ): Promise<TradeRoute | null> {
-    return findBestTradeRoute(this.getActiveAdapters(), tokenIn, tokenOut, amountIn);
+    // Check cache first
+    const cacheKey = `best_route:${tokenIn.address}:${tokenOut.address}:${amountIn}`;
+    const cached = this.getFromCache<TradeRoute | null>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const result = await findBestTradeRoute(this.getActiveAdapters(), tokenIn, tokenOut, amountIn);
+    
+    // Cache the result for a shorter period since this is price sensitive
+    if (result) {
+      this.addToCache(cacheKey, result);
+    }
+    
+    return result;
   }
 
   /**
@@ -147,6 +260,7 @@ export class DEXManager {
       };
     }
     
+    // No caching for execution functions as they modify state
     return executeSwap(adapter, tokenIn, tokenOut, amountIn, options);
   }
 
@@ -185,7 +299,20 @@ export class DEXManager {
       throw new Error(`DEX not found: ${dexId}`);
     }
     
-    return adapter.getTokenPrice(tokenA, tokenB);
+    // Check cache first
+    const cacheKey = `token_price:${dexId}:${tokenA.address}:${tokenB.address}`;
+    const cached = this.getFromCache<number>(cacheKey);
+    
+    if (cached !== null) {
+      return cached;
+    }
+    
+    const price = await adapter.getTokenPrice(tokenA, tokenB);
+    
+    // Cache the result
+    this.addToCache(cacheKey, price);
+    
+    return price;
   }
 
   /**
@@ -202,7 +329,40 @@ export class DEXManager {
       throw new Error(`DEX not found: ${dexId}`);
     }
     
-    return adapter.getLiquidity(tokenA, tokenB);
+    // Check cache first
+    const cacheKey = `liquidity:${dexId}:${tokenA.address}:${tokenB.address}`;
+    const cached = this.getFromCache<{
+      token0Reserves: string;
+      token1Reserves: string;
+      totalLiquidityUSD: number;
+    }>(cacheKey);
+    
+    if (cached) {
+      return cached;
+    }
+    
+    const liquidity = await adapter.getLiquidity(tokenA, tokenB);
+    
+    // Cache the result
+    this.addToCache(cacheKey, liquidity);
+    
+    return liquidity;
+  }
+  
+  /**
+   * Clear cache
+   */
+  clearCache(): void {
+    this.cache.clear();
+    this.lastCacheCleanup = Date.now();
+    logger.info('dex', 'DEX manager cache cleared');
+  }
+  
+  /**
+   * Check if DEX manager is ready
+   */
+  isReady(): boolean {
+    return this.ready;
   }
 }
 
