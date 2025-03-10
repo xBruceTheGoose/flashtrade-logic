@@ -112,9 +112,9 @@ export class SystemIntegration {
       logger.error('system', 'System initialization failed', { error });
       
       toast({
-        title: "System Error",
-        description: "Failed to initialize system. Please refresh the page to try again.",
-        variant: "destructive"
+          title: "System Error",
+          description: "Failed to initialize system. Please refresh the page to try again.",
+          variant: "destructive"
       });
       
       this.initializationInProgress = false;
