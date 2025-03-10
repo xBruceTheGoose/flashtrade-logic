@@ -1,4 +1,3 @@
-
 import { BlockchainService, blockchainService } from '../blockchain/blockchainService';
 import { appState, AppState } from './stateManagement';
 import { ErrorHandler, ErrorSeverity } from './errorHandling';
@@ -65,20 +64,16 @@ export class SystemIntegration {
       appState.setState(AppState.INITIALIZING);
       logger.info('system', 'Starting system initialization');
       
-      // Initialize components in order of dependency
       const blockchainInitialized = await this.initializeBlockchain();
       
-      // Try to initialize other modules even if blockchain failed
       await this.initializeWebWorkers();
       await this.initializeAI();
       await this.initializePriceMonitoring();
       
-      // If all critical components are initialized, set to READY
       if (blockchainInitialized) {
         appState.setState(AppState.READY);
         logger.info('system', 'System initialization completed successfully');
         
-        // Set up periodic health checks
         this.startHealthChecks();
         
         toast({
@@ -90,7 +85,6 @@ export class SystemIntegration {
         this.retryAttempts = 0;
         return true;
       } else {
-        // System can partially function with failed blockchain
         appState.setState(AppState.PAUSED);
         logger.warn('system', 'System initialization completed with warnings', 
           { status: this.status });
@@ -98,10 +92,9 @@ export class SystemIntegration {
         toast({
           title: "System Partially Ready",
           description: "Some components failed to initialize. Limited functionality available.",
-          variant: "warning"
+          variant: "destructive"
         });
         
-        // Set up health checks anyway to detect when components become available
         this.startHealthChecks();
         
         this.initializationInProgress = false;
@@ -126,7 +119,6 @@ export class SystemIntegration {
       
       this.initializationInProgress = false;
       
-      // Schedule retry if under the limit
       if (this.retryAttempts < this.maxRetryAttempts) {
         this.retryAttempts++;
         const retryDelay = Math.min(2000 * Math.pow(2, this.retryAttempts - 1), 30000);
@@ -147,31 +139,24 @@ export class SystemIntegration {
       clearInterval(this.healthCheckInterval);
     }
     
-    // Run health checks every 30 seconds
     this.healthCheckInterval = setInterval(() => {
       this.performHealthCheck();
     }, 30000);
     
-    // Run initial health check immediately
     this.performHealthCheck();
   }
   
   private async performHealthCheck(): Promise<void> {
     try {
-      // Check blockchain connectivity
       const blockchainConnected = await this.checkBlockchainConnectivity();
       this.status.moduleStatuses.blockchain = blockchainConnected;
       
-      // Check web workers
       const workersAvailable = workerManager.isReady();
       this.status.moduleStatuses.webWorkers = workersAvailable;
       
-      // Check DEX connectivity
       const dexReady = dexManager.isReady();
       
-      // Update system state based on checks
       if (appState.getState() === AppState.ERROR && blockchainConnected) {
-        // Recover from error state if blockchain is now connected
         appState.setState(AppState.READY);
         logger.info('system', 'System recovered from error state');
         
@@ -180,18 +165,16 @@ export class SystemIntegration {
           description: "System has recovered and is now operational"
         });
       } else if (appState.getState() === AppState.READY && !blockchainConnected) {
-        // Move to paused state if blockchain disconnected
         appState.setState(AppState.PAUSED);
         logger.warn('system', 'System paused due to blockchain connectivity issues');
         
         toast({
           title: "System Paused",
           description: "Blockchain connectivity issues detected. Limited functionality available.",
-          variant: "warning"
+          variant: "destructive"
         });
       }
       
-      // Check performance metrics
       this.updatePerformanceMetrics();
       
     } catch (error) {
@@ -200,7 +183,6 @@ export class SystemIntegration {
   }
   
   private updatePerformanceMetrics(): void {
-    // Get memory usage (if available)
     if (window.performance && (performance as any).memory) {
       const memoryInfo = (performance as any).memory;
       const usedHeapSize = memoryInfo.usedJSHeapSize;
@@ -210,7 +192,6 @@ export class SystemIntegration {
         const memoryUsagePercent = (usedHeapSize / totalHeapSize) * 100;
         this.status.performance.memoryUsage = memoryUsagePercent;
         
-        // Log warning if memory usage is high
         if (memoryUsagePercent > 80) {
           logger.warn('system', 'High memory usage detected', { 
             usedHeapSize, 
@@ -270,10 +251,8 @@ export class SystemIntegration {
   
   private async initializeAI(): Promise<boolean> {
     try {
-      // Mock AI service initialization - in a real app this would connect to AI services
       logger.info('system', 'Initializing AI services');
       
-      // For demo purposes, we'll set AI as available even if blockchain fails
       this.status.moduleStatuses.ai = true;
       
       return true;
@@ -288,14 +267,12 @@ export class SystemIntegration {
     try {
       logger.info('system', 'Initializing price monitoring service');
       
-      // Check if prerequisites are available
       if (!this.status.moduleStatuses.blockchain) {
         logger.warn('system', 'Price monitoring initialization skipped due to blockchain connectivity issues');
         this.status.errors.priceMonitoring = 'Blockchain connectivity required for price monitoring';
         return false;
       }
       
-      // For demo purposes we'll just mark it as initialized
       this.status.moduleStatuses.priceMonitoring = true;
       
       return true;
@@ -313,7 +290,6 @@ export class SystemIntegration {
         return false;
       }
       
-      // Check if blockchain service is correctly connected
       const isConnected = await this.blockchainService.isProviderConnected();
       
       if (!isConnected) {
@@ -353,18 +329,15 @@ export class SystemIntegration {
   }
   
   shutdown(): void {
-    // Clean up resources
     if (this.healthCheckInterval) {
       clearInterval(this.healthCheckInterval);
       this.healthCheckInterval = null;
     }
     
-    // Terminate web workers
     workerManager.terminateWorker();
     
     logger.info('system', 'System shutdown completed');
   }
 }
 
-// Export singleton instance
 export const systemIntegration = new SystemIntegration(blockchainService);
