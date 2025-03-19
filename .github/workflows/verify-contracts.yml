@@ -1,0 +1,72 @@
+name: Verify Smart Contracts
+
+on:
+  workflow_dispatch:
+    inputs:
+      network:
+        description: 'Network to verify contracts on'
+        required: true
+        type: choice
+        options:
+          - ethereum
+          - polygon
+          - arbitrum
+  push:
+    branches: [ main ]
+    paths:
+      - 'contracts/**'
+
+env:
+  ETHERSCAN_API_KEY: ${{ secrets.ETHERSCAN_API_KEY }}
+  POLYGONSCAN_API_KEY: ${{ secrets.POLYGONSCAN_API_KEY }}
+  ARBISCAN_API_KEY: ${{ secrets.ARBISCAN_API_KEY }}
+
+jobs:
+  verify:
+    name: Verify Contracts
+    runs-on: ubuntu-latest
+    if: ${{ github.event.workflow_run.conclusion == 'success' || github.event_name == 'workflow_dispatch' }}
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+        cache: 'npm'
+    
+    - name: Install dependencies
+      run: npm ci
+      
+    - name: Compile contracts
+      run: npx hardhat compile
+
+    - name: Download deployment artifacts
+      uses: actions/download-artifact@v4
+      with:
+        name: deployment-artifacts
+        path: deployments/
+        
+    - name: Verify on Etherscan
+      if: ${{ env.ETHERSCAN_API_KEY != '' && (github.event.inputs.network == 'ethereum' || github.event.inputs.network == 'all') }}
+      run: |
+        npx hardhat verify --network ethereum $(cat deployments/ethereum/ArbitrageExecutor.address)
+        npx hardhat verify --network ethereum $(cat deployments/ethereum/SecurityManager.address)
+        
+    - name: Verify on Polygonscan
+      if: ${{ env.POLYGONSCAN_API_KEY != '' && (github.event.inputs.network == 'polygon' || github.event.inputs.network == 'all') }}
+      run: |
+        npx hardhat verify --network polygon $(cat deployments/polygon/ArbitrageExecutor.address)
+        npx hardhat verify --network polygon $(cat deployments/polygon/SecurityManager.address)
+        
+    - name: Verify on Arbiscan
+      if: ${{ env.ARBISCAN_API_KEY != '' && (github.event.inputs.network == 'arbitrum' || github.event.inputs.network == 'all') }}
+      run: |
+        npx hardhat verify --network arbitrum $(cat deployments/arbitrum/ArbitrageExecutor.address)
+        npx hardhat verify --network arbitrum $(cat deployments/arbitrum/SecurityManager.address)
+        
+    - name: Update verification status
+      run: |
+        echo "Contract verification completed"
+        echo "Timestamp: $(date -u)" >> deployments/verification.log

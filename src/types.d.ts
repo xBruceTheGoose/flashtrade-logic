@@ -1,5 +1,5 @@
-
 import { Address } from "viem";
+import { BigNumber } from "bignumber.js";
 
 declare global {
   // Add any global declarations here
@@ -62,21 +62,67 @@ export interface DEX {
 // Arbitrage types
 export interface ArbitrageOpportunity {
   id: string;
-  sourceDex: DEX;
-  targetDex: DEX;
-  tokenIn: Token;
-  tokenOut: Token;
-  profitPercentage: number;
-  estimatedProfit: string;
-  gasEstimate: string;
-  tradeSize?: string;
   timestamp: number;
+  profitability: number;
+  confidence: number;
   status: 'pending' | 'executing' | 'completed' | 'failed';
-  // New fields for enhanced detection
-  path?: string[];          // Array of token addresses in path
-  dexPath?: string[];       // Array of DEX IDs in path
-  riskLevel?: 'low' | 'medium' | 'high';
-  confidenceScore?: number; // 0-100 value indicating confidence
+  details: {
+    marketConditions: MarketConditions;
+    networkState: NetworkState;
+    estimatedGasCost: string;
+  };
+}
+
+export interface ExecutionResult {
+  success: boolean;
+  profit: number;
+  transaction?: any;
+}
+
+// Market types
+export interface MarketConditions {
+  volatility: number;
+  volume24h: string;
+  priceChange24h: number;
+  liquidityDepth: {
+    [dex: string]: {
+      token0: BigNumber;
+      token1: BigNumber;
+      priceImpact: number;
+    };
+  };
+  spreadAnalysis: {
+    averageSpread: number;
+    bestBid: BigNumber;
+    bestAsk: BigNumber;
+  };
+  networkCongestion: 'low' | 'medium' | 'high';
+  timestamp: number;
+}
+
+export interface NetworkState {
+  network: string;
+  blockNumber: number;
+  timestamp: number;
+  averageGasPrice: string;
+  blockTime: number;
+  congestionLevel: number; // 0-100 scale
+  lastBlockTimestamp: number;
+  pendingTransactions: number;
+}
+
+export interface NetworkPreferences {
+  preferredNetworks: string[];
+  gasThresholds: Record<string, string>;
+}
+
+export interface UserPreferences {
+  riskTolerance: number;
+  minProfitThreshold: string;
+  maxSlippage: number;
+  gasOptimizationPriority: number;
+  tradeSizePreference: 'small' | 'medium' | 'large';
+  networkPreferences: NetworkPreferences;
 }
 
 // Transaction types
@@ -91,6 +137,44 @@ export interface Transaction {
   from: string;
   to: string;
   details?: any;
+}
+
+// Trade history types
+export interface TradeHistory {
+  timestamp: number;
+  dex: string;
+  tokenPair: {
+    token0: string;
+    token1: string;
+  };
+  inputAmount: string;
+  outputAmount: string;
+  expectedOutput: string;
+  actualSlippage: number;
+  gasUsed: string;
+  gasPrice: string;
+  blockNumber: number;
+  successful: boolean;
+  profitLoss: string;
+  executionTime: number;
+  marketConditions: MarketConditions;
+  networkState: NetworkState;
+}
+
+// Optimization result types
+export interface OptimizationResult {
+  recommendedTiming: number;
+  recommendedSize: string;
+  expectedMetrics: {
+    expectedProfit: string;
+    expectedSlippage: number;
+    estimatedGas: string;
+    confidence: number;
+  };
+  riskAssessment: {
+    level: 'low' | 'medium' | 'high';
+    factors: string[];
+  };
 }
 
 export {};
