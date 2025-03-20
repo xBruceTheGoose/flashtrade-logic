@@ -1,21 +1,24 @@
 {
-  "files": [],
+  "files": [
+    "hardhat.config.ts"
+  ],
   "references": [
     { "path": "./tsconfig.app.json" },
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
     // Language and Environment
-    "target": "ES2022",
+    "target": "es2020",
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    "module": "commonjs",
+    "moduleResolution": "node",
     "jsx": "react-jsx",
     
     // Module Resolution
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"],
+      "@/*": ["src/*"],
+      "@test/*": ["test/*"],
       "contracts/*": ["./src/contracts/*"],
       "types/*": ["./src/types/*"]
     },
@@ -67,7 +70,7 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "outDir": "./dist",
+    "outDir": "dist",
     
     // Build Optimization
     "noEmitOnError": true,
@@ -77,10 +80,16 @@
     // Web3-specific compiler options
     "experimentalDecorators": true,
     "emitDecoratorMetadata": true,
-    "useDefineForClassFields": true
+    "useDefineForClassFields": true,
+    "rootDir": "."
   },
   "include": [
+    "hardhat.config.ts",
+    "scripts/**/*.ts",
     "src/**/*",
+    "test/**/*.ts",
+    "typechain/**/*.ts",
+    "typechain/**/*.d.ts",
     "contracts/**/*",
     "types/**/*"
   ],
