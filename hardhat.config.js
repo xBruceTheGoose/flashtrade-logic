@@ -5,7 +5,11 @@ require("hardhat-gas-reporter");
 require("solidity-coverage");
 require("dotenv").config();
 
-const PRIVATE_KEY = process.env.PRIVATE_KEY || "0000000000000000000000000000000000000000000000000000000000000000";
+if (!process.env.PRIVATE_KEY) {
+  throw new Error("PRIVATE_KEY environment variable is required");
+}
+
+const PRIVATE_KEY = process.env.PRIVATE_KEY;
 
 module.exports = {
   solidity: {
@@ -37,14 +41,26 @@ module.exports = {
     polygon: {
       url: process.env.POLYGON_RPC_URL || "",
       accounts: [PRIVATE_KEY],
-      gasPrice: "auto",
-      timeout: 20000
+      gasPrice: async () => {
+        try {
+          const { default: axios } = await import('axios');
+          const response = await axios.get('https://gasstation.polygon.technology/v2');
+          const data = response.data;
+          return ethers.parseUnits(Math.ceil(data.fast.maxFee).toString(), 'gwei');
+        } catch (error) {
+          console.error('Failed to fetch gas price, using default');
+          return ethers.parseUnits('50', 'gwei');
+        }
+      },
+      timeout: 20000,
+      gasLimit: 8000000
     },
     arbitrum: {
       url: process.env.ARBITRUM_RPC_URL || "",
       accounts: [PRIVATE_KEY],
       gasPrice: "auto",
-      timeout: 20000
+      timeout: 20000,
+      gasLimit: 10000000
     }
   },
   gasReporter: {

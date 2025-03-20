@@ -1,13 +1,16 @@
-import { Contract, JsonRpcProvider } from 'ethers';
+import { Contract, JsonRpcProvider, Interface } from 'ethers';
 import { ArbitrageOpportunity } from '../types';
+import { getAbi } from '../utils/common/utils';
 
 export class SecurityManager extends Contract {
-  constructor(address: string, provider: JsonRpcProvider) {
-    super(address, [], provider);
+  private readonly abi: Interface;
+  constructor(address: string, abi: Interface, provider: JsonRpcProvider) {
+    super(address, abi, provider);
+    this.abi = abi;
   }
 
   static connect(address: string, provider: JsonRpcProvider): SecurityManager {
-    return new SecurityManager(address, provider);
+    return new SecurityManager(address, getAbi('SecurityManager'), provider);
   }
 
   async initialize(): Promise<void> {

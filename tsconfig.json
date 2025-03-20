@@ -5,27 +5,91 @@
     { "path": "./tsconfig.node.json" }
   ],
   "compilerOptions": {
+    // Language and Environment
     "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "NodeNext",
     "moduleResolution": "NodeNext",
     "jsx": "react-jsx",
+    
+    // Module Resolution
     "baseUrl": ".",
     "paths": {
-      "@/*": ["./src/*"]
+      "@/*": ["./src/*"],
+      "contracts/*": ["./src/contracts/*"],
+      "types/*": ["./src/types/*"]
     },
-    "noImplicitAny": false,
-    "noUnusedParameters": false,
-    "skipLibCheck": true,
-    "allowJs": true,
-    "noUnusedLocals": false,
-    "strictNullChecks": false,
-    "esModuleInterop": true,
-    "allowSyntheticDefaultImports": true,
+    "types": ["node", "jest"],
+    
+    // Strict Type Checking
     "strict": true,
-    "forceConsistentCasingInFileNames": true,
+    "noImplicitAny": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "strictBindCallApply": true,
+    "strictPropertyInitialization": true,
+    "noImplicitThis": true,
+    "useUnknownInCatchVariables": true,
+    "alwaysStrict": true,
+    
+    // Additional Checks
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "exactOptionalPropertyTypes": true,
+    "noImplicitReturns": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "noImplicitOverride": true,
+    "allowUnusedLabels": false,
+    "allowUnreachableCode": false,
+    
+    // Module Features
+    "allowJs": true,
     "resolveJsonModule": true,
     "isolatedModules": true,
+    "esModuleInterop": true,
+    "allowSyntheticDefaultImports": true,
+    
+    // Web3/Blockchain Specific
+    "skipLibCheck": true,
     "noEmit": true,
-    "types": ["node", "jest"]
-  }
+    "composite": true,
+    "incremental": true,
+    "forceConsistentCasingInFileNames": true,
+    
+    // Type Definitions
+    "typeRoots": [
+      "./node_modules/@types",
+      "./src/types"
+    ],
+    
+    // Project References
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    
+    // Build Optimization
+    "noEmitOnError": true,
+    "removeComments": true,
+    "preserveWatchOutput": true,
+    
+    // Web3-specific compiler options
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "useDefineForClassFields": true
+  },
+  "include": [
+    "src/**/*",
+    "contracts/**/*",
+    "types/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "build",
+    "coverage",
+    "**/*.test.ts",
+    "**/*.spec.ts"
+  ]
 }

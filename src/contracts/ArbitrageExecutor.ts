@@ -1,29 +1,49 @@
-import { Contract, JsonRpcProvider, ContractTransactionResponse } from 'ethers';
-import { ArbitrageOpportunity } from '../types';
+import { Contract, JsonRpcProvider, ContractTransactionResponse, Interface, BytesLike, TransactionRequest } from 'ethers';
+import { ArbitrageOpportunity, Token } from '../types';
+import { getContractAddress } from '../utils/blockchain/contractAddresses';
+import { getAbi } from '../utils/common/utils';
 
 export class ArbitrageExecutor extends Contract {
-  constructor(address: string, provider: JsonRpcProvider) {
-    super(address, [], provider);
+  private readonly abi: Interface;
+  constructor(address: string, abi: Interface, provider: JsonRpcProvider) {
+    super(address, abi, provider);
+    this.abi = abi;
   }
 
   static connect(address: string, provider: JsonRpcProvider): ArbitrageExecutor {
-    return new ArbitrageExecutor(address, provider);
+    const abi = getAbi('ArbitrageExecutor');
+    return new ArbitrageExecutor(address, abi, provider);
   }
 
   async initialize(): Promise<void> {
     // Initialization logic
   }
 
-  async execute(opportunity: ArbitrageOpportunity): Promise<ContractTransactionResponse> {
-    // This would be replaced with actual contract calls
-    // For now, we simulate a successful transaction
-    return {
-      hash: `0x${Date.now().toString(16)}`,
-      wait: async () => ({
-        status: 1,
-        gasUsed: BigInt(500000),
-        effectiveGasPrice: BigInt(2000000000), // 2 gwei
-      })
-    } as ContractTransactionResponse;
+  async execute(opportunity: ArbitrageOpportunity, token: Token): Promise<ContractTransactionResponse> {
+    const { dexA, dexB, amountA, amountB } = opportunity;
+    const { address: tokenAddress } = token;
+    const arbitrageExecutorAddress = getContractAddress('ArbitrageExecutor');
+
+    const data = this.abi.encodeFunctionData('executeArbitrage', [
+      dexA.address,
+      dexB.address,
+      tokenAddress,
+      amountA,
+      amountB,
+    ]);
+
+    const tx: TransactionRequest = {
+      to: arbitrageExecutorAddress,
+      data,
+      gasLimit: 500000, // Example gas limit
+    };
+
+    const signer = this.runner;
+    if (!signer) {
+      throw new Error('No signer available');
+    }
+
+    const transactionResponse = await signer.sendTransaction(tx);
+    return transactionResponse;
   }
 }
