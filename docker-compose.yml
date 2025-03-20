@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  hardhat:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "8545:8545" # For Hardhat network
+    command: sh -c "yarn hardhat node"
+    tty: true
+
+  test:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: sh -c "yarn hardhat test"
+    depends_on:
+      - hardhat
+
+  compile:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/app
+      - node_modules:/app/node_modules
+    environment:
+      - NODE_ENV=development
+    command: sh -c "yarn hardhat compile"
+
+volumes:
+  node_modules:

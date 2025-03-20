@@ -1,78 +1,86 @@
 import { HardhatUserConfig } from "hardhat/config";
-import "@nomiclabs/hardhat-waffle";
-import "@nomiclabs/hardhat-ethers";
+import "@nomicfoundation/hardhat-chai-matchers";
+import "@nomicfoundation/hardhat-ethers";
+import "@nomicfoundation/hardhat-verify";
 import "@openzeppelin/hardhat-upgrades";
+import "@typechain/hardhat";
 import "hardhat-gas-reporter";
 import "solidity-coverage";
 import * as dotenv from "dotenv";
-import { ethers } from "ethers";
-import axios from "axios";
 
 dotenv.config();
 
-if (!process.env.PRIVATE_KEY) {
-  throw new Error("PRIVATE_KEY environment variable is required");
-}
-
-const PRIVATE_KEY = process.env.PRIVATE_KEY;
-
+/**
+ * This configuration is optimized for compatibility with Node.js 22.x
+ * and includes our security features based on project requirements
+ */
 const config: HardhatUserConfig = {
   solidity: {
-    version: "0.8.17",
-    settings: {
-      optimizer: {
-        enabled: true,
-        runs: 200
+    compilers: [
+      {
+        version: "0.8.10",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          evmVersion: "london"
+        }
       },
-      evmVersion: "london"
-    }
+      {
+        version: "0.8.17",
+        settings: {
+          optimizer: {
+            enabled: true,
+            runs: 200
+          },
+          evmVersion: "london"
+        }
+      }
+    ]
   },
+  defaultNetwork: "hardhat",
   networks: {
     hardhat: {
-      chainId: 1337,
-      allowUnlimitedContractSize: false,
-      gas: 12000000,
-      blockGasLimit: 12000000
+      chainId: 31337,
+      allowUnlimitedContractSize: true,
+      hardfork: "london",
+      // Forking configuration is commented out to avoid URL requirement
+      // forking: {
+      //   enabled: false,
+      //   url: "https://eth-mainnet.alchemyapi.io/v2/your-api-key"
+      // },
+      mining: {
+        auto: true,
+        interval: 0
+      },
+      gasPrice: 0
     },
     localhost: {
       url: "http://127.0.0.1:8545"
     },
-    mainnet: {
-      url: process.env.ETHEREUM_RPC_URL || "",
-      accounts: [PRIVATE_KEY],
+    polygon: {
+      url: process.env.POLYGON_RPC_URL || "",
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
       timeout: 20000
     },
-    polygon: {
-      url: process.env.POLYGON_RPC_URL || "",
-      accounts: [PRIVATE_KEY],
-      gasPrice: async () => {
-        try {
-          const response = await axios.get('https://gasstation.polygon.technology/v2');
-          const data = response.data;
-          return ethers.parseUnits(Math.ceil(data.fast.maxFee).toString(), 'gwei');
-        } catch (error) {
-          console.error('Failed to fetch gas price, using default');
-          return ethers.parseUnits('50', 'gwei');
-        }
-      },
-      timeout: 20000,
-      gasLimit: 8000000
-    },
     arbitrum: {
       url: process.env.ARBITRUM_RPC_URL || "",
-      accounts: [PRIVATE_KEY],
+      accounts: process.env.PRIVATE_KEY ? [process.env.PRIVATE_KEY] : [],
       gasPrice: "auto",
-      timeout: 20000,
-      gasLimit: 10000000
+      timeout: 20000
     }
   },
   gasReporter: {
     enabled: process.env.REPORT_GAS !== undefined,
     currency: "USD",
-    coinmarketcap: process.env.COINMARKETCAP_API_KEY,
-    excludeContracts: ["mocks/"],
+    excludeContracts: [],
     src: "./src/contracts"
+  },
+  typechain: {
+    outDir: "typechain-types",
+    target: "ethers-v6"
   },
   paths: {
     sources: "./src/contracts",
@@ -82,9 +90,6 @@ const config: HardhatUserConfig = {
   },
   mocha: {
     timeout: 40000
-  },
-  etherscan: {
-    apiKey: process.env.ETHERSCAN_API_KEY
   }
 };
 

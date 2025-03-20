@@ -1,9 +1,53 @@
-
 # Welcome to your Lovable project
 
 ## Project info
 
 **URL**: https://lovable.dev/projects/c174070a-5981-4bb8-8d67-883eddd9729c
+
+## Docker Environment for Node.js Compatibility
+
+This project now includes a Docker setup to ensure compatibility with Hardhat, which has issues with Node.js v22+.
+
+### Docker Setup Instructions
+
+1. **Prerequisites**:
+   - Install [Docker](https://www.docker.com/products/docker-desktop/)
+   - Install [Docker Compose](https://docs.docker.com/compose/install/) (comes with Docker Desktop for Windows)
+
+2. **Build the Docker images**:
+   ```sh
+   yarn docker:build
+   ```
+
+3. **Common Docker commands**:
+   ```sh
+   # Compile contracts using Docker (Node.js v16)
+   yarn docker:compile
+
+   # Run all tests
+   yarn docker:test
+
+   # Run only integration tests
+   yarn docker:test:integration
+
+   # Start a Hardhat node for development
+   yarn docker:node
+
+   # Open a shell in the container
+   yarn docker:shell
+   ```
+
+4. **Run custom Hardhat commands**:
+   ```sh
+   # Example: Run custom script
+   docker-compose run --rm hardhat yarn hardhat run scripts/your-script.js
+   ```
+
+### Docker Configuration Files
+
+- `Dockerfile`: Sets up Node.js v16 with required dependencies
+- `docker-compose.yml`: Defines services for compilation, testing, and running a Hardhat node
+- `.dockerignore`: Excludes unnecessary files from the Docker build context
 
 ## How can I edit this code?
 
